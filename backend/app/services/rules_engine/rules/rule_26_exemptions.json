@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "LMPC-R26-A-WEIGHT",
+    "citation": "Rule 26(a)",
+    "requirement": "small_package_exemption_10g_10ml",
+    "applies_when": "quantity_le_10g_or_10ml",
+    "check_type": "exemption_bypass",
+    "severity": "info",
+    "violation_template": "Exempted: Package net quantity <= 10g or 10ml under Rule 26(a)"
+  }
+]

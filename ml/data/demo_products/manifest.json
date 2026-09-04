@@ -1,0 +1,36 @@
+{
+  "sih26034_demo_suite": [
+    {
+      "sku_id": "SKU-01",
+      "product_name": "Britannia Good Day Butter Cookies 100g",
+      "barcode": "8901030000001",
+      "category": "biscuits",
+      "expected_verdict": "compliant",
+      "notes": "Compliant standard packaging adhering to Rule 6, Rule 7 (2.5mm height > 2.0mm req), and Second Schedule standard 100g size."
+    },
+    {
+      "sku_id": "SKU-02",
+      "product_name": "Britannia Good Day 65g (Off-Size)",
+      "barcode": "8901030000004",
+      "category": "biscuits",
+      "expected_verdict": "violation",
+      "notes": "Violates Rule 5 / Second Schedule Item 4: 65g is not an approved standard pack size, lacks 'Not a standard pack size' declaration."
+    },
+    {
+      "sku_id": "SKU-03",
+      "product_name": "PureGlow Herbal Soap 75g (Undersized Numeral)",
+      "barcode": "8901030000002",
+      "category": "soaps",
+      "expected_verdict": "violation",
+      "notes": "Violates Rule 7(2) Table I: Numeral height 1.4mm measured < 2.0mm statutory minimum."
+    },
+    {
+      "sku_id": "SKU-04",
+      "product_name": "SilkGleam Shampoo Sachet 6ml",
+      "barcode": "8901030000005",
+      "category": "cosmetics",
+      "expected_verdict": "exempt",
+      "notes": "Exempted under Rule 26(a): Package net quantity <= 10ml."
+    }
+  ]
+}

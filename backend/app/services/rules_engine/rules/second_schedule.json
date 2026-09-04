@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "LMPC-R5-SECOND-SCHEDULE",
+    "citation": "Rule 5, Second Schedule",
+    "requirement": "prescribed_standard_package_size",
+    "applies_when": "scheduled_category",
+    "check_type": "whitelist_or_declared_exception",
+    "severity": "moderate",
+    "violation_template": "Declared quantity {quantity} is not an approved standard pack size for {category} under the Second Schedule, and lacks mandatory 'Not a standard pack size' declaration"
+  }
+]

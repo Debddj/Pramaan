@@ -1,0 +1,20 @@
+[
+  {
+    "rule_id": "LMPC-R7-TABLE-1",
+    "citation": "Rule 7(2), Table I",
+    "requirement": "minimum_numeral_height_by_quantity",
+    "applies_when": "net_quantity_declared",
+    "check_type": "numerical_min",
+    "severity": "critical",
+    "violation_template": "Measured numeral height {measured}mm is below statutory minimum {required}mm required for a {quantity} package under Rule 7(2), Table I"
+  },
+  {
+    "rule_id": "LMPC-R7-TABLE-2",
+    "citation": "Rule 7(2), Table II",
+    "requirement": "minimum_numeral_height_by_pdp_area",
+    "applies_when": "pdp_area_available",
+    "check_type": "numerical_min",
+    "severity": "critical",
+    "violation_template": "Measured numeral height {measured}mm is below statutory minimum {required}mm required for PDP area {pdp_area} sq cm under Rule 7(2), Table II"
+  }
+]

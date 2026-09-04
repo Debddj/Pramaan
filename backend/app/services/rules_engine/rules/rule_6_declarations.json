@@ -1,0 +1,56 @@
+[
+  {
+    "rule_id": "LMPC-R6-1-A",
+    "citation": "Rule 6(1)(a)",
+    "requirement": "manufacturer_or_packer_name_and_address",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Manufacturer or Packer name and complete address is missing under Rule 6(1)(a)"
+  },
+  {
+    "rule_id": "LMPC-R6-1-B",
+    "citation": "Rule 6(1)(b)",
+    "requirement": "generic_or_common_name",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Generic or common commodity name is omitted under Rule 6(1)(b)"
+  },
+  {
+    "rule_id": "LMPC-R6-1-C",
+    "citation": "Rule 6(1)(c)",
+    "requirement": "net_quantity_declaration",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Net quantity declaration is missing or incomplete under Rule 6(1)(c)"
+  },
+  {
+    "rule_id": "LMPC-R6-1-D",
+    "citation": "Rule 6(1)(d)",
+    "requirement": "month_and_year_of_manufacture",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Month and year of manufacture/packing is missing under Rule 6(1)(d)"
+  },
+  {
+    "rule_id": "LMPC-R6-1-E",
+    "citation": "Rule 6(1)(e)",
+    "requirement": "mrp_inclusive_of_all_taxes",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Retail sale price (MRP) does not state 'inclusive of all taxes' or is missing under Rule 6(1)(e)"
+  },
+  {
+    "rule_id": "LMPC-R6-2-CARE",
+    "citation": "Rule 6(2)",
+    "requirement": "consumer_care_details",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Consumer care name, telephone, or email contact is completely omitted under Rule 6(2)"
+  }
+]

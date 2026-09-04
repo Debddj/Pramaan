@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "LMPC-R9-CONTRAST",
+    "citation": "Rule 9(1)(b)",
+    "requirement": "conspicuous_background_contrast",
+    "applies_when": "always",
+    "check_type": "contrast_ratio_min",
+    "severity": "moderate",
+    "violation_template": "Numeral contrast ratio {measured}:1 is below required minimum contrast 3.0:1 under Rule 9(1)(b)"
+  }
+]
