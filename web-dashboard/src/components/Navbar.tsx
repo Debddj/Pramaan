@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShieldCheck, Scale, AlertTriangle, FileText, BarChart3 } from 'lucide-react';
+﻿import React from 'react';
+import { ShieldCheck, Scale, AlertTriangle, BarChart3 } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;

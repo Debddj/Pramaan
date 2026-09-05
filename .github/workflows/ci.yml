@@ -7,28 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-  backend-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libzbar0
-      - name: Install dependencies
-        run: |
-          cd backend
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run Pytest Suite
-        run: |
-          cd backend
-          python -m pytest tests/ -v --tb=short
-
   backend-lint:
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +18,46 @@ jobs:
       - name: Run Ruff Linter
         run: |
           pip install ruff
-          ruff check backend/app --ignore E501,F401,F841
+          ruff check backend/app --select E,F --ignore E501,F401,F841,E712
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pramaan
+          POSTGRES_USER: pramaan
+          POSTGRES_PASSWORD: pramaan_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libzbar0 libpango-1.0-0 libpangoft2-1.0-0 libglib2.0-0
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run Pytest Suite
+        env:
+          DATABASE_URL: postgresql://pramaan:pramaan_dev@localhost:5432/pramaan
+          SECRET_KEY: pramaan-ci-test-secret-key-at-least-32-chars-long
+        run: |
+          cd backend
+          python -m pytest tests/ -v --tb=short
 
   dashboard-build:
     runs-on: ubuntu-latest
@@ -63,3 +80,6 @@ jobs:
       - name: Build Backend Docker Image
         run: |
           docker build -t pramaan-backend ./backend
+      - name: Build Dashboard Docker Image
+        run: |
+          docker build -t pramaan-dashboard ./web-dashboard

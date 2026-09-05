@@ -16,7 +16,7 @@ def list_review_queue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    scans = db.query(Scan).filter(Scan.needs_review == True).all()
+    scans = db.query(Scan).filter(Scan.needs_review.is_(True)).all()
     return [
         {
             "scan_uuid": s.scan_uuid,

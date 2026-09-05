@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { StatCard } from './components/StatCard';
 import { StatutoryBadge } from './components/StatutoryBadge';
@@ -9,19 +9,14 @@ import {
   AlertOctagon, 
   Clock, 
   FileCheck2, 
-  Scan as ScanIcon, 
   Ruler, 
-  Search, 
   CheckCircle2, 
-  FileDown, 
-  Sliders
+  FileDown
 } from 'lucide-react';
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'adjudication' | 'review'>('dashboard');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [currentScan, setCurrentScan] = useState<ScanResult | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getDashboardMetrics().then(setMetrics);
@@ -29,7 +24,6 @@ export default function App() {
   }, []);
 
   const handleSimulate = async (scenario: 'normal' | 'undersized' | 'off_size' | 'exempt') => {
-    setLoading(true);
     let params = {
       barcode: "8901030000001",
       category: "biscuits",
@@ -59,7 +53,6 @@ export default function App() {
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
     }
   };
 
@@ -350,7 +343,7 @@ export default function App() {
                     <span className="font-mono text-xs text-amber-400 font-bold">PRM-GLARE-88</span>
                     <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Specular Glare on Barcode</span>
                   </div>
-                  <div className="text-xs text-slate-400">Barcode: 8901030048123 • Confidence: 74%</div>
+                  <div className="text-xs text-slate-400">Barcode: 8901030048123 â€¢ Confidence: 74%</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded">Inspect Calipers</button>
@@ -364,7 +357,7 @@ export default function App() {
                     <span className="font-mono text-xs text-amber-400 font-bold">PRM-CYL-42</span>
                     <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Cylindrical Distortion on Shampoo Bottle</span>
                   </div>
-                  <div className="text-xs text-slate-400">Barcode: 8901030099411 • Confidence: 78%</div>
+                  <div className="text-xs text-slate-400">Barcode: 8901030099411 â€¢ Confidence: 78%</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded">Dewarp View</button>
