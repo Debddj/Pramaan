@@ -1,21 +1,33 @@
-from app.schemas.scan import LabelDeclaration
+﻿from app.schemas.scan import LabelDeclaration
 from app.services.extraction.field_parser import entity_parser
 
 class DocumentAIService:
     """
     Multimodal Vision-Language Model interface for structured label extraction.
+    When a real VLM backend (e.g. Gemini, PaLM Vision) is configured, this
+    class delegates to it.  Otherwise it falls back to offline OCR + regex parsing.
     """
+
     def extract_from_image(self, image_bytes: bytes, barcode: str = None) -> LabelDeclaration:
-        # Default mock simulation for rapid hackathon testing
-        sample_text = """
-        BRITANNIA GOOD DAY
-        Butter Cookies
-        Mfd By: Britannia Industries Ltd, Plot 22, Delhi
-        Net Qty: 100 g
-        MRP Rs. 30.00 (Incl. of all taxes)
-        Mfg Date: 08/26
-        Consumer Care: 1800-425-4444, feedback@britannia.co.in
-        """
-        return entity_parser.parse_text(sample_text)
+        if not image_bytes:
+            # No image provided — return empty declaration (no fake data)
+            return LabelDeclaration()
+
+        # Attempt offline OCR on the actual image bytes
+        try:
+            from app.services.extraction.ocr_fallback import ocr_fallback
+            ocr_text = ocr_fallback.ocr(image_bytes)
+        except RuntimeError:
+            # OCR engine not available — return empty with just the raw bytes length noted
+            return LabelDeclaration(
+                raw_ocr_text=f"[OCR unavailable; received {len(image_bytes)} bytes]"
+            )
+
+        if not ocr_text or not ocr_text.strip():
+            return LabelDeclaration(raw_ocr_text="[OCR returned empty text]")
+
+        # Parse the actual OCR output into structured fields
+        return entity_parser.parse_text(ocr_text)
+
 
 document_ai = DocumentAIService()

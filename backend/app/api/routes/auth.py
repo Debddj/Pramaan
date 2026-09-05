@@ -1,6 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+﻿from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from app.core.security import create_access_token
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.core.security import create_access_token, verify_password
+from app.models.user import User
 
 router = APIRouter()
 
@@ -9,8 +12,29 @@ class LoginRequest(BaseModel):
     password: str
 
 @router.post("/auth/login")
-def login(creds: LoginRequest):
-    if creds.email == "officer@consumer.gov.in" and creds.password == "sih2026":
-        token = create_access_token(subject="officer@consumer.gov.in")
-        return {"access_token": token, "token_type": "bearer", "role": "officer", "name": "Inspector R. Sharma"}
-    return {"access_token": create_access_token(subject=creds.email), "token_type": "bearer", "role": "officer", "name": "Officer"}
+def login(creds: LoginRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate a user by email and password.
+    Returns a JWT only if credentials match a registered, active user.
+    """
+    user = db.query(User).filter(User.email == creds.email).first()
+
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not verify_password(creds.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    token = create_access_token(subject=user.email)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user.role,
+        "name": user.full_name,
+    }

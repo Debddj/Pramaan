@@ -1,4 +1,4 @@
-import re
+﻿import re
 from typing import Optional, Dict, Any
 from app.schemas.scan import LabelDeclaration
 
@@ -17,7 +17,7 @@ class EntityParser:
             decl.net_quantity_unit = qty_match.group(2).lower()
 
         # 2. MRP regex
-        mrp_pattern = r'(?:mrp|max\s*retail\s*price)[\s.:]*(?:rs\.?|inr|₹)?\s*([0-9.]+)'
+        mrp_pattern = r'(?:mrp|max\s*retail\s*price)[\s.:]*(?:rs\.?|inr|\u20b9)?\s*([0-9.]+)'
         mrp_match = re.search(mrp_pattern, text, re.IGNORECASE)
         if mrp_match:
             decl.mrp = float(mrp_match.group(1))
@@ -40,12 +40,17 @@ class EntityParser:
         if phone_match:
             decl.consumer_care_phone = phone_match.group(1)
 
-        # 5. Manufacturer / Packer
-        mfg_pattern = r'(?:mfd\s*by|manufactured\s*by|packed\s*by|marketed\s*by)[\s.:]*([^,\r\n]+)'
+        # 5. Manufacturer / Packer — parse BOTH name AND address from text
+        mfg_pattern = r'(?:mfd\s*by|manufactured\s*by|packed\s*by|marketed\s*by)[\s.:]*(.+?)(?:\n|\r|$)'
         mfg_match = re.search(mfg_pattern, text, re.IGNORECASE)
         if mfg_match:
-            decl.manufacturer_name = mfg_match.group(1).strip()
-            decl.manufacturer_address = "Industrial Area, Phase II, New Delhi 110020"
+            full_line = mfg_match.group(1).strip()
+            # Try to split name and address at the first comma
+            parts = full_line.split(',', 1)
+            decl.manufacturer_name = parts[0].strip()
+            if len(parts) > 1:
+                decl.manufacturer_address = parts[1].strip()
+            # else: address stays None (honest — we couldn't parse it)
 
         # 6. Generic name fallback
         t_low = text.lower()
