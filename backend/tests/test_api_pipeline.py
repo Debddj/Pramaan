@@ -1,4 +1,6 @@
-﻿import pytest
+﻿import io
+import pytest
+from PIL import Image
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -18,6 +20,14 @@ def test_health_endpoint(client):
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+
+
+def test_health_deep_endpoint(client):
+    response = client.get("/api/v1/health/deep")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["database"] == "healthy"
+    assert data["storage"] == "healthy"
 
 
 def test_login_valid_credentials(client):
@@ -40,13 +50,11 @@ def test_login_invalid_credentials(client):
 
 
 def test_scan_requires_auth(client):
-    """Scan endpoint must reject unauthenticated requests."""
     response = client.post("/api/v1/scan", json={"barcode": "123"})
     assert response.status_code in (401, 403)
 
 
 def test_scan_with_raw_ocr_text(client, auth_headers):
-    """Scan with raw_ocr_text should parse it and return real extraction."""
     payload = {
         "barcode": "8901030000001",
         "pdp_area_sq_cm": 150.0,
@@ -60,7 +68,6 @@ def test_scan_with_raw_ocr_text(client, auth_headers):
     data = response.json()
     assert "scan_uuid" in data
     assert data["scale_factor_mm_per_px"] == pytest.approx(0.05, abs=0.001)
-    # Extracted declarations should reflect the OCR text, not phantom data
     decl = data["extracted_declarations"]
     assert decl["generic_name"] == "Biscuits"
     assert decl["net_quantity_value"] == 100.0
@@ -68,7 +75,6 @@ def test_scan_with_raw_ocr_text(client, auth_headers):
 
 
 def test_scan_without_input_returns_empty(client, auth_headers):
-    """Scan without raw_ocr_text or image_base64 should return empty extraction."""
     payload = {
         "barcode": "0000000000000",
         "pdp_area_sq_cm": 150.0,
@@ -80,9 +86,30 @@ def test_scan_without_input_returns_empty(client, auth_headers):
     assert response.status_code == 200
     data = response.json()
     decl = data["extracted_declarations"]
-    # Empty input -> no phantom extraction
     assert decl["generic_name"] is None
     assert decl["manufacturer_name"] is None
+
+
+def test_scan_multipart_upload(client, auth_headers):
+    # Generate in-memory dummy JPEG image
+    img = Image.new("RGB", (100, 100), color=(73, 109, 137))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    buf.seek(0)
+
+    files = {"file": ("label.jpg", buf, "image/jpeg")}
+    data = {
+        "barcode": "8901030000001",
+        "pdp_area_sq_cm": "150.0",
+        "category": "biscuits",
+    }
+
+    response = client.post("/api/v1/scan/upload", files=files, data=data, headers=auth_headers)
+    assert response.status_code == 200
+    res_data = response.json()
+    assert "scan_uuid" in res_data
+    assert res_data["image_url"] is not None
+    assert res_data["sha256_hash"] is not None
 
 
 def test_dashboard_requires_auth(client):

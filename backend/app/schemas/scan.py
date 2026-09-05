@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+﻿from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -48,6 +48,7 @@ class ScanResult(BaseModel):
     extracted_declarations: LabelDeclaration
     violations: List[ViolationOut] = []
     sha256_hash: Optional[str] = None
+    image_url: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class ReviewAction(BaseModel):

@@ -1,0 +1,198 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Statutory Legal Metrology Notice</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 9pt;
+      color: #666;
+    }
+  }
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #111;
+    line-height: 1.5;
+    font-size: 11pt;
+  }
+  .header {
+    text-align: center;
+    border-bottom: 2px solid #991b1b;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  .header h1 {
+    font-size: 14pt;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #991b1b;
+  }
+  .header h2 {
+    font-size: 11pt;
+    font-weight: normal;
+    margin: 4px 0 0 0;
+    color: #333;
+  }
+  .meta-grid {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-size: 10pt;
+  }
+  .meta-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 10pt;
+  }
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+  }
+  .badge-danger {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 8.5pt;
+  }
+  .hash-box {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 8.5pt;
+    background: #f8fafc;
+    border: 1px dashed #94a3b8;
+    padding: 8px;
+    word-break: break-all;
+    margin-top: 8px;
+  }
+  .signature-section {
+    margin-top: 40px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .signature-box {
+    width: 250px;
+    border-top: 1px solid #333;
+    padding-top: 6px;
+    text-align: center;
+    font-size: 9.5pt;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Government of India</h1>
+  <h2>Ministry of Consumer Affairs, Food & Public Distribution</h2>
+  <h2>Department of Consumer Affairs — Legal Metrology Division</h2>
+  <p style="font-size: 10pt; font-weight: bold; margin-top: 8px; text-decoration: underline;">
+    STATUTORY NOTICE OF INSPECTION & APPARENT CONTRAVENTION
+  </p>
+</div>
+
+<div class="meta-box">
+  <table style="border: none; margin: 0;">
+    <tr style="border: none;">
+      <td style="border: none; padding: 2px;"><strong>Notice Ref:</strong> {{ notice_ref | e }}</td>
+      <td style="border: none; padding: 2px; text-align: right;"><strong>Date:</strong> {{ date | e }}</td>
+    </tr>
+    <tr style="border: none;">
+      <td style="border: none; padding: 2px;"><strong>Inspection ID:</strong> {{ scan_uuid | e }}</td>
+      <td style="border: none; padding: 2px; text-align: right;"><strong>Jurisdiction:</strong> Central Inspection Unit</td>
+    </tr>
+  </table>
+</div>
+
+<p><strong>To:</strong><br>
+The Managing Director / Authorized Signatory<br>
+<strong>{{ manufacturer_name | default("Manufacturer / Packer / Importer", true) | e }}</strong><br>
+{{ manufacturer_address | default("Address as on package record", true) | e }}
+</p>
+
+<p>
+<strong>SUBJECT: Notice under Section 36 of Legal Metrology Act, 2009 read with Legal Metrology (Packaged Commodities) Rules, 2011</strong>
+</p>
+
+<p>
+WHEREAS, an automated statutory inspection was executed on the packaged commodity detailed hereunder:
+</p>
+
+<ul>
+  <li><strong>Commodity / Brand:</strong> {{ commodity_name | e }}</li>
+  <li><strong>Barcode (EAN-13):</strong> {{ barcode | default("Not detected / unreadable", true) | e }}</li>
+  <li><strong>Package Declared Net Quantity:</strong> {{ net_quantity | default("N/A", true) | e }}</li>
+  <li><strong>Declared Maximum Retail Price (MRP):</strong> {{ mrp | default("N/A", true) | e }}</li>
+</ul>
+
+<p>
+AND WHEREAS, optical metrology and automated rule verification determined that the package contravenes statutory declarations mandated by the Legal Metrology (Packaged Commodities) Rules, 2011:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Statutory Rule</th>
+      <th style="width: 15%;">Severity</th>
+      <th>Details of Non-Compliance</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for v in violations %}
+    <tr>
+      <td><strong>{{ v.rule_citation | e }}</strong></td>
+      <td><span class="badge-danger">{{ v.severity | upper | e }}</span></td>
+      <td>{{ v.violation_details | e }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="3" style="text-align: center; color: #166534;">No contraventions detected. Full statutory compliance observed.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="meta-box" style="margin-top: 20px;">
+  <strong>CRYPTOGRAPHIC CHAIN OF CUSTODY EVIDENCE</strong>
+  <div class="hash-box">
+    <strong>SHA-256 Evidence Hash:</strong> {{ sha256_hash | e }}<br>
+    <strong>Verification Engine:</strong> Pramaan Statutory Inspection Engine v{{ engine_version | default("2.0.0", true) | e }}<br>
+    <strong>Timestamp:</strong> {{ timestamp | e }} UTC
+  </div>
+</div>
+
+<p>
+You are hereby given notice to explain within <strong>fifteen (15) days</strong> of receipt why legal proceedings under Section 36 of the Legal Metrology Act, 2009 should not be initiated against you.
+</p>
+
+<div class="signature-section">
+  <div style="font-size: 9pt; color: #555;">
+    Issued by Pramaan Statutory Inspection Service<br>
+    Authorized Digital Copy — Valid without physical seal
+  </div>
+  <div class="signature-box">
+    <strong>{{ officer_name | default("Authorized Legal Metrology Officer", true) | e }}</strong><br>
+    Legal Metrology Officer / Inspector<br>
+    Badge ID: {{ officer_id | default("IN-LMO-9482", true) | e }}
+  </div>
+</div>
+
+</body>
+</html>

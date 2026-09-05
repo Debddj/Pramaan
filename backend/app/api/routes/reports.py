@@ -22,11 +22,9 @@ def get_pdf_notice(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    # Reconstruct declarations from actual stored extraction data
     extracted = scan.extracted_data or {}
     decl = LabelDeclaration(**extracted) if extracted else LabelDeclaration()
 
-    # Fetch real violations from the DB for this scan
     db_violations = db.query(ViolationModel).filter(ViolationModel.scan_id == scan.id).all()
     violations = [
         ViolationOut(
@@ -55,15 +53,19 @@ def get_pdf_notice(
         violations=violations,
         declarations=decl,
         measured_font_height_mm=scan.measured_numeral_height_mm,
-        required_font_height_mm=None,  # Would need to re-derive from lookup
+        required_font_height_mm=None,
         pdp_area_sq_cm=scan.pdp_area_sq_cm,
         sha256_evidence_hash=scan.image_hash_sha256 or "N/A",
         inspecting_officer_badge=current_user.badge_number or "N/A",
     )
 
-    pdf_bytes = generate_pdf_report(report)
+    doc_bytes = generate_pdf_report(report)
+    is_pdf = doc_bytes.startswith(b"%PDF")
+    media_type = "application/pdf" if is_pdf else "text/html"
+    ext = "pdf" if is_pdf else "html"
+
     return Response(
-        content=pdf_bytes,
-        media_type="text/html",
-        headers={"Content-Disposition": f"inline; filename=Notice_{scan_uuid}.html"},
+        content=doc_bytes,
+        media_type=media_type,
+        headers={"Content-Disposition": f"inline; filename=Notice_{scan_uuid}.{ext}"},
     )

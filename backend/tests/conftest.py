@@ -4,14 +4,17 @@ from app.main import app
 from app.schemas.scan import LabelDeclaration
 from app.db.init_db import init as init_db
 
+
 @pytest.fixture(scope="session", autouse=True)
 def seed_database():
     """Ensure demo users and products exist before any test runs."""
     init_db()
 
+
 @pytest.fixture
 def client():
     return TestClient(app)
+
 
 @pytest.fixture
 def auth_token(client):
@@ -23,10 +26,18 @@ def auth_token(client):
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     return resp.json()["access_token"]
 
+
 @pytest.fixture
 def auth_headers(auth_token):
     """Return a dict suitable for passing as headers= to TestClient requests."""
     return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture
+def auth_client(client, auth_headers):
+    client.headers.update(auth_headers)
+    return client
+
 
 @pytest.fixture
 def compliant_declaration():

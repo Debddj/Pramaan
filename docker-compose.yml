@@ -1,6 +1,24 @@
-version: '3.8'
+﻿version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pramaan-postgres
+    environment:
+      POSTGRES_DB: pramaan
+      POSTGRES_USER: pramaan
+      POSTGRES_PASSWORD: pramaan_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pramaan -d pramaan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -9,11 +27,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./pramaan.db
+      - DATABASE_URL=postgresql://pramaan:pramaan_dev@postgres:5432/pramaan
       - TRIAGE_CONFIDENCE_THRESHOLD=0.85
+      - STORAGE_BACKEND=local
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=gemini-3.5-flash
     volumes:
       - ./backend:/app
       - backend-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   web-dashboard:
@@ -31,3 +55,4 @@ services:
 
 volumes:
   backend-data:
+  pgdata:

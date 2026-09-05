@@ -1,4 +1,4 @@
-name: Pramaan CI Pipeline
+﻿name: Pramaan CI Pipeline
 
 on:
   push:
@@ -15,6 +15,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libzbar0
       - name: Install dependencies
         run: |
           cd backend
@@ -23,4 +27,39 @@ jobs:
       - name: Run Pytest Suite
         run: |
           cd backend
-          pytest tests/ -v
+          python -m pytest tests/ -v --tb=short
+
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run Ruff Linter
+        run: |
+          pip install ruff
+          ruff check backend/app --ignore E501,F401,F841
+
+  dashboard-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build Web Dashboard
+        run: |
+          cd web-dashboard
+          npm ci
+          npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Backend Docker Image
+        run: |
+          docker build -t pramaan-backend ./backend

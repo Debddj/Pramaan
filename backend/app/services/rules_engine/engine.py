@@ -1,18 +1,42 @@
-import json
+﻿import json
 import os
-from typing import List, Dict, Any, Tuple
+import glob
+from typing import List, Dict, Any, Tuple, Optional
 from app.schemas.scan import LabelDeclaration, ViolationOut
+from app.services.rules_engine.unit_normalizer import normalize_to_base_unit, normalize_unit
 from app.services.rules_engine.lookup_tables import (
     lookup_table_1_min_height,
     lookup_table_2_min_height,
     is_second_schedule_standard_size
 )
 
+
 class RulesEngine:
-    def __init__(self, rules_dir: str = None):
+    VERSION: str = "2.0.0"
+    RULES_EFFECTIVE_DATE: str = "2024-01-01"
+
+    def __init__(self, rules_dir: Optional[str] = None):
         if not rules_dir:
             rules_dir = os.path.join(os.path.dirname(__file__), "rules")
         self.rules_dir = rules_dir
+        self.rules_catalog: Dict[str, dict] = {}
+        self._load_rules()
+
+    def _load_rules(self):
+        """Loads and indexes all external JSON rule files."""
+        if not os.path.exists(self.rules_dir):
+            return
+        for file_path in glob.glob(os.path.join(self.rules_dir, "*.json")):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        for rule in data:
+                            r_id = rule.get("rule_id")
+                            if r_id:
+                                self.rules_catalog[r_id] = rule
+            except Exception:
+                pass
 
     def evaluate(
         self,
@@ -31,10 +55,8 @@ class RulesEngine:
 
         # 1. Rule 26 Exemption Check (<= 10g / 10ml)
         if decl.net_quantity_value is not None and decl.net_quantity_unit:
-            u = decl.net_quantity_unit.lower()
-            val = decl.net_quantity_value
-            is_small = (u in ['g', 'ml'] and val <= 10.0)
-            if is_small:
+            base_val, base_unit = normalize_to_base_unit(decl.net_quantity_value, decl.net_quantity_unit)
+            if base_val is not None and base_unit in ['g', 'ml'] and base_val <= 10.0:
                 return "exempt", []
 
         # 2. Rule 6(1) Mandatory Declarations
@@ -127,7 +149,6 @@ class RulesEngine:
         # 4. Second Schedule Pack Size Enforcement
         if decl.net_quantity_value is not None and decl.net_quantity_unit and category != "general":
             is_std = is_second_schedule_standard_size(category, decl.net_quantity_value, decl.net_quantity_unit)
-            # Check if exception declared
             has_exception = "not a standard pack size" in (decl.raw_ocr_text or "").lower()
             if not is_std and not has_exception:
                 violations.append(ViolationOut(
@@ -152,5 +173,6 @@ class RulesEngine:
 
         status = "violation" if violations else "compliant"
         return status, violations
+
 
 engine_instance = RulesEngine()
