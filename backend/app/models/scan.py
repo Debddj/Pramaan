@@ -11,6 +11,7 @@ class Scan(Base):
     barcode = Column(String, index=True, nullable=True)
     image_path = Column(String, nullable=True)
     image_hash_sha256 = Column(String, nullable=True)
+    image_data_base64 = Column(Text, nullable=True)
     
     # Optical calibration telemetry
     detected_barcode_width_px = Column(Float, nullable=True)

@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 import hashlib
 import base64
 from typing import Optional
@@ -11,7 +11,7 @@ from app.models.scan import Scan
 from app.models.violation import Violation
 from app.schemas.scan import ScanRequest, ScanResult, LabelDeclaration, ViolationOut
 from app.services.preprocessing.barcode_calibration import calibrator
-from app.services.preprocessing.barcode_detector import barcode_detector
+from app.services.preprocessing.barcode_detector import barcode_detector, validate_ean13_checksum
 from app.services.preprocessing.quality_check import assess_image_quality
 from app.services.extraction.document_ai import document_ai
 from app.services.extraction.field_parser import entity_parser
@@ -34,16 +34,15 @@ def _compute_extraction_confidence(decl: LabelDeclaration) -> float:
         decl.net_quantity_unit,
         decl.mfg_date,
         decl.mrp,
-        decl.consumer_care_email or decl.consumer_care_phone,
     ]
-    filled = sum(1 for f in expected_fields if f is not None and f != "")
-    return round(filled / len(expected_fields), 2)
+    present = sum(1 for f in expected_fields if f is not None)
+    return round(present / len(expected_fields), 2)
 
 
 def _process_scan_core(
     db: Session,
     current_user: User,
-    image_bytes: bytes,
+    image_bytes: bytes = b"",
     raw_ocr_text: Optional[str] = None,
     client_barcode: Optional[str] = None,
     client_barcode_width_px: Optional[float] = None,
@@ -53,12 +52,14 @@ def _process_scan_core(
 ) -> ScanResult:
     scan_uuid = f"PRM-{uuid.uuid4().hex[:8].upper()}"
     image_url: Optional[str] = None
+    image_b64: Optional[str] = None
 
     # 1. Image Storage & Content Hashing
     if image_bytes:
         record = object_store.store(image_bytes, ext="jpg")
         sha256_hash = record.sha256_hash
-        image_url = record.path
+        image_url = record.data_uri or record.path
+        image_b64 = record.base64_data
     else:
         sha256_hash = hashlib.sha256(scan_uuid.encode()).hexdigest()
 
@@ -66,25 +67,48 @@ def _process_scan_core(
     quality = assess_image_quality(image_bytes) if image_bytes else None
 
     # 3. Barcode Detection & Optical Calibration
-    barcode = client_barcode or "0000000000000"
-    detected_barcode_width_px = client_barcode_width_px or 745.8
+    barcode = client_barcode
+    detected_barcode_width_px = client_barcode_width_px
+    detected_text_height_px = client_text_height_px
+    is_checksum_valid = None
 
     if image_bytes:
         detection = barcode_detector.detect(image_bytes)
         if detection:
             barcode = detection.barcode_data
             detected_barcode_width_px = detection.pixel_width
+            is_checksum_valid = detection.is_checksum_valid
+
+    if barcode and is_checksum_valid is None:
+        is_checksum_valid = validate_ean13_checksum(barcode)
+
+    # Determine calibration status without fabricating values
+    is_calibrated = False
+    calibration_status = "uncalibrated"
+    calibration_note = None
+    scale_factor = None
+    measured_height_mm = None
+
+    if detected_barcode_width_px and detected_barcode_width_px > 0:
+        scale_factor = calibrator.compute_scale_factor(detected_barcode_width_px)
+        if detected_text_height_px and detected_text_height_px > 0:
+            measured_height_mm = calibrator.measure_height_mm(detected_text_height_px, scale_factor)
+            is_calibrated = True
+            calibration_status = "calibrated"
+        else:
+            calibration_status = "partial"
+            calibration_note = "Barcode standard detected, but net quantity numeral box was not isolated"
+    else:
+        calibration_status = "uncalibrated"
+        calibration_note = "No standard EAN-13 barcode detected on packaging for optical calibration"
 
     pdp_area = pdp_area_sq_cm or 150.0
-    scale_factor = calibrator.compute_scale_factor(detected_barcode_width_px)
-    detected_text_height_px = client_text_height_px or 36.0
-    measured_height_mm = calibrator.measure_height_mm(detected_text_height_px, scale_factor)
 
     # 4. Entity Extraction
     if raw_ocr_text:
         extracted_decl = entity_parser.parse_text(raw_ocr_text)
     elif image_bytes:
-        extracted_decl = document_ai.extract_from_image(image_bytes, barcode=barcode)
+        extracted_decl = document_ai.extract_from_image(image_bytes, barcode=barcode or "")
     else:
         extracted_decl = LabelDeclaration()
 
@@ -101,8 +125,10 @@ def _process_scan_core(
 
     # 6. Confidence & Triage Assessment
     overall_confidence = _compute_extraction_confidence(extracted_decl)
-    needs_review = (overall_confidence < settings.TRIAGE_CONFIDENCE_THRESHOLD) or (
-        quality is not None and not quality.is_acceptable
+    needs_review = (
+        (overall_confidence < settings.TRIAGE_CONFIDENCE_THRESHOLD)
+        or (quality is not None and not quality.is_acceptable)
+        or (not is_calibrated)
     )
     final_status = "under_review" if needs_review else status_result
 
@@ -111,7 +137,9 @@ def _process_scan_core(
         scan_uuid=scan_uuid,
         officer_id=current_user.id,
         barcode=barcode,
+        image_path=image_url,
         image_hash_sha256=sha256_hash,
+        image_data_base64=image_b64,
         detected_barcode_width_px=detected_barcode_width_px,
         scale_factor_mm_per_px=scale_factor,
         pdp_area_sq_cm=pdp_area,
@@ -149,6 +177,7 @@ def _process_scan_core(
             "status": final_status,
             "confidence": overall_confidence,
             "violations_count": len(violations),
+            "is_calibrated": is_calibrated,
         },
     )
 
@@ -158,6 +187,10 @@ def _process_scan_core(
         status=final_status,
         overall_confidence=overall_confidence,
         needs_review=needs_review,
+        is_calibrated=is_calibrated,
+        calibration_status=calibration_status,
+        is_checksum_valid=is_checksum_valid,
+        calibration_note=calibration_note,
         scale_factor_mm_per_px=scale_factor,
         pdp_area_sq_cm=pdp_area,
         measured_numeral_height_mm=measured_height_mm,

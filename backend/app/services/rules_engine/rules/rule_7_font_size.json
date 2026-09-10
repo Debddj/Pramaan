@@ -16,5 +16,14 @@
     "check_type": "numerical_min",
     "severity": "critical",
     "violation_template": "Measured numeral height {measured}mm is below statutory minimum {required}mm required for PDP area {pdp_area} sq cm under Rule 7(2), Table II"
+  },
+  {
+    "rule_id": "LMPC-R7-UNCALIBRATED",
+    "citation": "Rule 7(2)",
+    "requirement": "optical_metrology_calibration",
+    "applies_when": "barcode_unreadable",
+    "check_type": "metrology_presence",
+    "severity": "critical",
+    "violation_template": "Net quantity numeral height could not be verified optically: EAN-13 barcode standard not detected on packaging."
   }
 ]

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -140,6 +140,9 @@ WHEREAS, an automated statutory inspection was executed on the packaged commodit
   <li><strong>Barcode (EAN-13):</strong> {{ barcode | default("Not detected / unreadable", true) | e }}</li>
   <li><strong>Package Declared Net Quantity:</strong> {{ net_quantity | default("N/A", true) | e }}</li>
   <li><strong>Declared Maximum Retail Price (MRP):</strong> {{ mrp | default("N/A", true) | e }}</li>
+  {% if measured_font_height %}
+  <li><strong>Optical Numeral Height (Measured):</strong> {{ measured_font_height | e }}</li>
+  {% endif %}
 </ul>
 
 <p>

@@ -68,3 +68,19 @@ def test_rule_26_small_package_exemption(compliant_declaration):
     )
     assert status == "exempt"
     assert len(violations) == 0
+
+
+def test_uncalibrated_barcode_flags_violation(compliant_declaration):
+    engine = RulesEngine()
+    # When barcode detection fails or cannot calibrate, measured_height_mm is None
+    status, violations = engine.evaluate(
+        decl=compliant_declaration,
+        measured_height_mm=None,
+        category="biscuits"
+    )
+    assert status == "violation"
+    uncalibrated = [v for v in violations if v.rule_id == "LMPC-R7-UNCALIBRATED"]
+    assert len(uncalibrated) == 1
+    assert "Rule 7(2)" in uncalibrated[0].citation
+    assert "Not calibrated" in uncalibrated[0].measured_value
+    assert "EAN-13 barcode standard not detected" in uncalibrated[0].violation_text

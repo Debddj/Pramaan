@@ -1,13 +1,15 @@
-﻿import pytest
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas.scan import LabelDeclaration
 from app.db.init_db import init as init_db
+from app.middleware.rate_limiter import limiter
 
 
 @pytest.fixture(scope="session", autouse=True)
 def seed_database():
-    """Ensure demo users and products exist before any test runs."""
+    """Ensure demo users and products exist and disable rate limiter for tests."""
+    limiter.enabled = False
     init_db()
 
 

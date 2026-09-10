@@ -1,6 +1,7 @@
-﻿import re
+import re
 from typing import Optional, Dict, Any
 from app.schemas.scan import LabelDeclaration
+from app.services.classification.category_classifier import COMMODITY_KEYWORDS
 
 class EntityParser:
     """
@@ -10,18 +11,31 @@ class EntityParser:
         decl = LabelDeclaration(raw_ocr_text=text)
         
         # 1. Net Quantity regex
-        qty_pattern = r'(?:net\s*qty|net\s*quantity|net\s*content|net\s*wt)[\s.:]*([0-9.]+)\s*(kg|g|gm|ml|l|ltr|litre|liter)'
+        qty_pattern = r'(?:net\s*qty|net\s*quantity|net\s*content|net\s*wt|quantity)[\s.:]*([0-9.]+)\s*(kg|kgs|g|gm|gms|ml|l|ltr|litre|liter)\b'
         qty_match = re.search(qty_pattern, text, re.IGNORECASE)
         if qty_match:
-            decl.net_quantity_value = float(qty_match.group(1))
-            decl.net_quantity_unit = qty_match.group(2).lower()
+            try:
+                decl.net_quantity_value = float(qty_match.group(1))
+                unit = qty_match.group(2).lower()
+                if unit in ['gm', 'gms']:
+                    unit = 'g'
+                elif unit == 'kgs':
+                    unit = 'kg'
+                elif unit in ['ltr', 'litre', 'liter']:
+                    unit = 'l'
+                decl.net_quantity_unit = unit
+            except (ValueError, TypeError):
+                pass
 
-        # 2. MRP regex
-        mrp_pattern = r'(?:mrp|max\s*retail\s*price)[\s.:]*(?:rs\.?|inr|\u20b9)?\s*([0-9.]+)'
+        # 2. MRP regex - handles M.R.P., M. R. P., Maximum Retail Price, etc.
+        mrp_pattern = r'(?:m\.?\s*r\.?\s*p\.?|max(?:imum)?\s*retail\s*price|retail\s*price)[\s.:]*(?:rs\.?|inr|\u20b9)?\s*([0-9]+(?:\.[0-9]{1,2})?)'
         mrp_match = re.search(mrp_pattern, text, re.IGNORECASE)
         if mrp_match:
-            decl.mrp = float(mrp_match.group(1))
-            decl.is_mrp_inclusive_of_taxes = bool(re.search(r'incl|inclusive|all\s*taxes', text, re.IGNORECASE))
+            try:
+                decl.mrp = float(mrp_match.group(1))
+                decl.is_mrp_inclusive_of_taxes = bool(re.search(r'incl|inclusive|all\s*taxes', text, re.IGNORECASE))
+            except (ValueError, TypeError):
+                pass
 
         # 3. Dates
         date_pattern = r'(?:mfg|pkd|packed|date)[\s.:]*([0-9]{2}[/-][0-9]{2,4}|[A-Za-z]{3}\s*[0-9]{2,4})'
@@ -50,16 +64,46 @@ class EntityParser:
             decl.manufacturer_name = parts[0].strip()
             if len(parts) > 1:
                 decl.manufacturer_address = parts[1].strip()
-            # else: address stays None (honest — we couldn't parse it)
 
-        # 6. Generic name fallback
+        # 6. Generic name fallback via COMMODITY_KEYWORDS across all 27 categories
+        CATEGORY_CANONICAL_NAMES = {
+            "biscuits": "Biscuits",
+            "soaps": "Toilet Soap",
+            "edible_oil": "Edible Refined Oil",
+            "tea": "Tea",
+            "coffee": "Coffee",
+            "baby_food": "Baby Food",
+            "bread": "Bread",
+            "butter": "Butter",
+            "milk_powder": "Milk Powder",
+            "detergent": "Detergent",
+            "pulses": "Pulses",
+            "atta": "Atta",
+            "maida": "Maida",
+            "suji": "Suji",
+            "rice": "Rice",
+            "salt": "Salt",
+            "spices": "Spices",
+            "ghee": "Ghee",
+            "toothpaste": "Toothpaste",
+            "hair_oil": "Hair Oil",
+            "cement": "Cement",
+            "paint": "Paint",
+            "varnish": "Varnish",
+            "noodles": "Noodles",
+            "aerated_beverage": "Aerated Beverage",
+            "mineral_water": "Mineral Water",
+            "fruit_juice": "Fruit Juice",
+        }
+
         t_low = text.lower()
-        if "biscuit" in t_low or "cookie" in t_low:
-            decl.generic_name = "Biscuits"
-        elif "soap" in t_low:
-            decl.generic_name = "Toilet Soap"
-        elif "oil" in t_low:
-            decl.generic_name = "Edible Refined Oil"
+        for cat_name, keywords in COMMODITY_KEYWORDS.items():
+            for kw in keywords:
+                if kw in t_low:
+                    decl.generic_name = CATEGORY_CANONICAL_NAMES.get(cat_name, cat_name.replace('_', ' ').title())
+                    break
+            if decl.generic_name:
+                break
 
         return decl
 

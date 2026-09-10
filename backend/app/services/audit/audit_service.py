@@ -1,4 +1,4 @@
-﻿import json
+import json
 import hashlib
 from datetime import datetime
 from typing import Optional, Tuple, Any
@@ -25,7 +25,14 @@ class AuditService:
         after_state: Optional[Any] = None,
         reason: Optional[str] = None,
     ) -> AuditLog:
-        last_log = db.query(AuditLog).order_by(AuditLog.id.desc()).first()
+        query = db.query(AuditLog).order_by(AuditLog.id.desc())
+        try:
+            bind = db.get_bind()
+            if bind and bind.dialect.name != "sqlite":
+                query = query.with_for_update()
+        except Exception:
+            pass
+        last_log = query.first()
         prev_hash = last_log.record_hash if last_log else GENESIS_PREV_HASH
 
         ts = datetime.utcnow()

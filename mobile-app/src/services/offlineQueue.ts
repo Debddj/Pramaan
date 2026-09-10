@@ -1,4 +1,5 @@
-﻿import { api } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { api } from "./api";
 
 export interface QueuedScan {
   id: string;
@@ -10,9 +11,38 @@ export interface QueuedScan {
   error?: string;
 }
 
+const STORAGE_KEY = "@pramaan_offline_scans";
 let queue: QueuedScan[] = [];
+let isInitialized = false;
+
+const persistQueue = async () => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+  } catch (err) {
+    console.warn("Failed to persist offline queue to storage:", err);
+  }
+};
+
+const initQueue = async () => {
+  if (isInitialized) return;
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      queue = JSON.parse(raw);
+    }
+  } catch (err) {
+    console.warn("Failed to load offline queue from storage:", err);
+  } finally {
+    isInitialized = true;
+  }
+};
+
+// Kick off initial storage hydration
+initQueue();
 
 export const offlineQueue = {
+  init: initQueue,
+
   getQueue: (): QueuedScan[] => [...queue],
 
   enqueue: (item: Omit<QueuedScan, "id" | "timestamp" | "status">): QueuedScan => {
@@ -23,6 +53,7 @@ export const offlineQueue = {
       status: "pending",
     };
     queue.push(record);
+    persistQueue();
     return record;
   },
 
@@ -56,6 +87,7 @@ export const offlineQueue = {
         item.error = err.message || "Upload failed";
         failed++;
       }
+      persistQueue();
       if (onProgress) onProgress(i + 1, pending.length);
     }
     return { success, failed };
@@ -63,5 +95,6 @@ export const offlineQueue = {
 
   clearSynced: () => {
     queue = queue.filter((i) => i.status !== "synced");
+    persistQueue();
   },
 };

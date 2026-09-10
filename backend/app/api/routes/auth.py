@@ -1,9 +1,11 @@
-﻿from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import create_access_token, verify_password
 from app.models.user import User
+from app.middleware.rate_limiter import limiter
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -12,7 +14,8 @@ class LoginRequest(BaseModel):
     password: str
 
 @router.post("/auth/login")
-def login(creds: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+def login(request: Request, creds: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate a user by email and password.
     Returns a JWT only if credentials match a registered, active user.

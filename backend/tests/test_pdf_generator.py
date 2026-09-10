@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from app.schemas.report import LegalNoticeReport
 from app.schemas.scan import LabelDeclaration, ViolationOut
 from app.services.reporting.pdf_generator import generate_pdf_report, render_html_notice
@@ -39,3 +39,52 @@ def test_pdf_rendering_escapes_xss():
 
     doc_bytes = generate_pdf_report(report)
     assert len(doc_bytes) > 0
+
+
+def test_pdf_rendering_contains_real_evidence_data():
+    report = LegalNoticeReport(
+        notice_number="NOTICE-TEST-002",
+        scan_uuid="SCAN-REAL-999",
+        timestamp="2026-09-05T08:00:00",
+        product_name="Sunfeast Dark Fantasy",
+        manufacturer="ITC Limited",
+        barcode="8901725123456",
+        status="violation",
+        violations=[
+            ViolationOut(
+                rule_id="LMPC-R7-TABLE-1",
+                citation="Rule 7(2), Table I",
+                severity="critical",
+                measured_value="1.85 mm",
+                required_value="4.00 mm",
+                violation_text="Measured numeral height 1.85mm is below statutory minimum 4.00mm",
+            )
+        ],
+        declarations=LabelDeclaration(
+            manufacturer_name="ITC Limited",
+            manufacturer_address="Plot 42, Industrial Area, Haridwar, Uttarakhand",
+            generic_name="Filled Biscuits",
+            net_quantity_value=300.0,
+            net_quantity_unit="g",
+            mrp=90.0,
+            is_mrp_inclusive_of_taxes=True,
+        ),
+        measured_font_height_mm=1.85,
+        required_font_height_mm=4.0,
+        pdp_area_sq_cm=160.0,
+        sha256_evidence_hash="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        inspecting_officer_badge="IN-LMO-4821",
+    )
+
+    html = render_html_notice(report)
+    # Ensure real evidence data is present
+    assert "Plot 42, Industrial Area, Haridwar, Uttarakhand" in html
+    assert "300.0 g" in html
+    assert "Rs. 90.00 (Incl. of all taxes)" in html
+    assert "1.85 mm" in html
+    assert "SCAN-REAL-999" in html
+    assert "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" in html
+
+    # Ensure placeholder strings are completely absent
+    assert "Address as registered in inspection file" not in html
+    assert "As recorded in scan declaration" not in html

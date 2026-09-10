@@ -1,4 +1,4 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
   postgres:
@@ -28,6 +28,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://pramaan:pramaan_dev@postgres:5432/pramaan
+      - SECRET_KEY=${SECRET_KEY:-pramaan-sih26034-docker-secret-key}
       - TRIAGE_CONFIDENCE_THRESHOLD=0.85
       - STORAGE_BACKEND=local
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}

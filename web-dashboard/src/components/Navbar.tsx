@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ShieldCheck, Scale, AlertTriangle, BarChart3, PlusCircle, LogOut, KeyRound } from 'lucide-react';
 import { OfficerSession } from '../api/types';
 
@@ -9,6 +9,7 @@ interface NavbarProps {
   officerSession: OfficerSession | null;
   onOpenNewInspection: () => void;
   onReLogin: () => void;
+  onLogout: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   officerSession,
   onOpenNewInspection,
   onReLogin,
+  onLogout,
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -150,17 +152,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-[11px] transition"
                   >
                     <KeyRound className="w-3.5 h-3.5" />
-                    Re-authenticate
+                    Switch User
                   </button>
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);
-                      onReLogin();
+                      onLogout();
                     }}
                     className="flex items-center gap-1.5 text-slate-400 hover:text-rose-400 text-[11px] transition"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    Reset
+                    Sign Out
                   </button>
                 </div>
               </div>

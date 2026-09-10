@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 import { OfficerSession } from './types';
 
 const TOKEN_KEY = 'pramaan_jwt_token';
@@ -44,22 +44,10 @@ export const loginOfficer = async (email: string, password: string): Promise<Off
   return session;
 };
 
-export const ensureDefaultAuth = async (): Promise<OfficerSession> => {
+export const ensureDefaultAuth = async (): Promise<OfficerSession | null> => {
   const existing = getOfficerSession();
   if (existing && existing.token) {
     return existing;
   }
-  try {
-    return await loginOfficer('officer@consumer.gov.in', 'sih2026');
-  } catch (err) {
-    // If backend is offline, return fallback session structure for UI hydration
-    const offlineSession: OfficerSession = {
-      token: 'demo-offline-token',
-      email: 'officer@consumer.gov.in',
-      name: 'Inspector R. Sharma',
-      badge_number: 'DL-LM-4821',
-      role: 'officer',
-    };
-    return offlineSession;
-  }
+  return null;
 };

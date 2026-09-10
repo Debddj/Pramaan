@@ -1,4 +1,4 @@
-﻿import secrets
+import secrets
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Pramaan Statutory Inspection Engine"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: str = "pramaan-sih26034-production-secret-key-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     ALGORITHM: str = "HS256"
 
@@ -16,7 +16,14 @@ class Settings(BaseSettings):
     # Fallback for local dev without Postgres:
     # DATABASE_URL: str = "sqlite:///./pramaan.db"
 
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+    ]
+    CORS_ORIGIN_REGEX: Optional[str] = r"^https?://(localhost|127\.0\.0\.1|.*\.onrender\.com|.*\.vercel\.app)(:\d+)?$"
 
     # ---------- Statutory Calibration & Risk ----------
     EAN13_NOMINAL_WIDTH_MM: float = 37.29

@@ -4,6 +4,7 @@ import { StatCard } from './components/StatCard';
 import { StatutoryBadge } from './components/StatutoryBadge';
 import { ConfidenceCard } from './components/ConfidenceCard';
 import { NewInspectionModal } from './components/NewInspectionModal';
+import { OfficerLoginModal } from './components/OfficerLoginModal';
 import { ToastContainer, ToastItem } from './components/Toast';
 import { 
   getDashboardMetrics, 
@@ -14,7 +15,7 @@ import {
   downloadNoticePdf, 
   formatApiError 
 } from './api/client';
-import { ensureDefaultAuth, loginOfficer, clearAuth } from './api/auth';
+import { ensureDefaultAuth, clearAuth } from './api/auth';
 import { DashboardMetrics, ScanResult, ReviewQueueItem, OfficerSession } from './api/types';
 import { 
   ShieldCheck, 
@@ -35,6 +36,7 @@ import {
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'adjudication' | 'review'>('dashboard');
   const [officerSession, setOfficerSession] = useState<OfficerSession | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   
   // Dashboard Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -80,13 +82,19 @@ export default function App() {
   const initApp = useCallback(async () => {
     try {
       const session = await ensureDefaultAuth();
-      setOfficerSession(session);
+      if (session) {
+        setOfficerSession(session);
+        fetchMetrics();
+        fetchReviewQueue();
+        handleSimulate('normal', false);
+      } else {
+        setOfficerSession(null);
+        setIsLoginModalOpen(true);
+      }
     } catch (e) {
-      console.warn('Authentication auto-hydration error:', e);
+      console.warn('Authentication check error:', e);
+      setIsLoginModalOpen(true);
     }
-    fetchMetrics();
-    fetchReviewQueue();
-    handleSimulate('normal', false);
   }, []);
 
   useEffect(() => {
@@ -295,18 +303,24 @@ export default function App() {
     }
   };
 
-  // Re-authentication modal/action
-  const handleReLogin = async () => {
+  const handleLoginSuccess = (session: OfficerSession) => {
+    setOfficerSession(session);
+    setIsLoginModalOpen(false);
+    addToast('success', `Logged in as ${session.name} (Badge: ${session.badge_number})`, 'Officer Authenticated');
+    fetchMetrics();
+    fetchReviewQueue();
+    handleSimulate('normal', false);
+  };
+
+  const handleLogout = () => {
     clearAuth();
-    try {
-      const session = await loginOfficer('officer@consumer.gov.in', 'sih2026');
-      setOfficerSession(session);
-      addToast('success', `Logged in as ${session.name} (Badge: ${session.badge_number})`, 'Officer Session Refreshed');
-      fetchMetrics();
-      fetchReviewQueue();
-    } catch (err: unknown) {
-      addToast('error', 'Failed to authenticate with backend server.', 'Auth Error');
-    }
+    setOfficerSession(null);
+    setIsLoginModalOpen(true);
+    addToast('info', 'Officer session ended.', 'Signed Out');
+  };
+
+  const handleSwitchUser = () => {
+    setIsLoginModalOpen(true);
   };
 
   return (
@@ -321,7 +335,14 @@ export default function App() {
         reviewCount={reviewQueue.length}
         officerSession={officerSession}
         onOpenNewInspection={() => setIsNewInspectionOpen(true)}
-        onReLogin={handleReLogin}
+        onReLogin={handleSwitchUser}
+        onLogout={handleLogout}
+      />
+
+      {/* Officer Authentication Gate Modal */}
+      <OfficerLoginModal
+        isOpen={isLoginModalOpen || !officerSession}
+        onLoginSuccess={handleLoginSuccess}
       />
 
       {/* New Inspection Modal */}

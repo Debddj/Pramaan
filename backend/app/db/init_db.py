@@ -1,23 +1,47 @@
+from sqlalchemy import text
 from app.core.database import Base, engine, SessionLocal
 from app.models.user import User
 from app.models.product import Product
 from app.core.security import get_password_hash
 
+import os
+
+DEFAULT_OFFICER_EMAIL = os.getenv("DEFAULT_OFFICER_EMAIL", "officer@consumer.gov.in")
+DEFAULT_OFFICER_PASSWORD = os.getenv("DEFAULT_OFFICER_PASSWORD", "sih2026")
+DEFAULT_OFFICER_NAME = os.getenv("DEFAULT_OFFICER_NAME", "Inspector R. Sharma")
+DEFAULT_OFFICER_BADGE = os.getenv("DEFAULT_OFFICER_BADGE", "DL-LM-4821")
+
 def init():
     Base.metadata.create_all(bind=engine)
+
+    # Schema migration for existing SQLite DBs
+    try:
+        with engine.connect() as conn:
+            if "sqlite" in str(engine.url):
+                res = conn.execute(text("PRAGMA table_info(scans)"))
+                cols = [r[1] for r in res.fetchall()]
+                if cols and "image_data_base64" not in cols:
+                    conn.execute(text("ALTER TABLE scans ADD COLUMN image_data_base64 TEXT"))
+                    conn.commit()
+    except Exception as e:
+        print("Schema migration notice:", e)
+
     db = SessionLocal()
     
     try:
-        # Create default inspector if not exists
-        if not db.query(User).filter(User.email == "officer@consumer.gov.in").first():
+        # Create default inspector if not exists, or refresh hash to valid bcrypt
+        existing_officer = db.query(User).filter(User.email == DEFAULT_OFFICER_EMAIL).first()
+        if not existing_officer:
             inspector = User(
-                email="officer@consumer.gov.in",
-                hashed_password=get_password_hash("sih2026"),
-                full_name="Inspector R. Sharma",
-                badge_number="DL-LM-4821",
+                email=DEFAULT_OFFICER_EMAIL,
+                hashed_password=get_password_hash(DEFAULT_OFFICER_PASSWORD),
+                full_name=DEFAULT_OFFICER_NAME,
+                badge_number=DEFAULT_OFFICER_BADGE,
                 role="officer"
             )
             db.add(inspector)
+        else:
+            existing_officer.hashed_password = get_password_hash(DEFAULT_OFFICER_PASSWORD)
 
         # Seed demo products
         sample_products = [

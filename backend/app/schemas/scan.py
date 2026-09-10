@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -42,6 +42,10 @@ class ScanResult(BaseModel):
     status: str
     overall_confidence: float
     needs_review: bool
+    is_calibrated: bool = False
+    calibration_status: str = "uncalibrated"
+    is_checksum_valid: Optional[bool] = None
+    calibration_note: Optional[str] = None
     scale_factor_mm_per_px: Optional[float] = None
     pdp_area_sq_cm: Optional[float] = None
     measured_numeral_height_mm: Optional[float] = None
