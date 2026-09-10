@@ -70,6 +70,7 @@ export const api = {
     if (isFormData) {
       const res = await apiClient.post("/scan/upload", data, {
         headers: { "Content-Type": "multipart/form-data" },
+        transformRequest: (d: any) => d,
       });
       return res.data;
     } else {
