@@ -1,10 +1,17 @@
-import os
-import io
 import hashlib
-from datetime import datetime
-from typing import Optional
+import html
+import io
+import logging
+import os
+from datetime import datetime, timezone
+from typing import Any, Optional
+
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 from app.schemas.report import LegalNoticeReport
+
+logger = logging.getLogger(__name__)
+
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -81,10 +88,6 @@ def render_html_notice(report: LegalNoticeReport) -> str:
     )
 
 
-import html
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 def _render_reportlab_pdf(report: LegalNoticeReport) -> bytes:
