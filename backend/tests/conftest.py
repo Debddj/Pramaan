@@ -52,6 +52,8 @@ def compliant_declaration():
         mfg_date="08/2026",
         mrp=30.0,
         is_mrp_inclusive_of_taxes=True,
+        consumer_care_name="Consumer Care Cell",
+        consumer_care_address="5/1A Hungerford Street, Kolkata",
         consumer_care_email="feedback@britannia.co.in",
         consumer_care_phone="1800-425-4444",
     )

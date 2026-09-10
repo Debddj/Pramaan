@@ -84,3 +84,26 @@ def test_uncalibrated_barcode_flags_violation(compliant_declaration):
     assert "Rule 7(2)" in uncalibrated[0].citation
     assert "Not calibrated" in uncalibrated[0].measured_value
     assert "EAN-13 barcode standard not detected" in uncalibrated[0].violation_text
+
+
+def test_consumer_care_granular_validation(compliant_declaration):
+    engine = RulesEngine()
+    # Missing phone and email individually
+    compliant_declaration.consumer_care_phone = None
+    compliant_declaration.consumer_care_email = None
+    status, violations = engine.evaluate(decl=compliant_declaration, measured_height_mm=2.5)
+    assert status == "violation"
+    rule_ids = [v.rule_id for v in violations]
+    assert "LMPC-R6-2-CARE" in rule_ids
+    assert "LMPC-R6-2-PHONE" in rule_ids
+    assert "LMPC-R6-2-EMAIL" in rule_ids
+
+
+def test_corrupted_rule_file_raises_runtime_error(tmp_path):
+    # Invalid JSON in rules directory should raise RuntimeError
+    bad_rule = tmp_path / "bad_rule.json"
+    bad_rule.write_text("{invalid_json: true", encoding="utf-8")
+    with pytest.raises(RuntimeError) as exc_info:
+        RulesEngine(rules_dir=str(tmp_path))
+    assert "Corrupted or invalid statutory rule definition" in str(exc_info.value)
+

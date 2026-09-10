@@ -1,16 +1,27 @@
-﻿# Legal Metrology (Packaged Commodities) Rules, 2011 - Rule 7(2) Tables & Second Schedule
+# Legal Metrology (Packaged Commodities) Rules, 2011 - Rule 7(2) Tables & Second Schedule
 from typing import Dict, List, Optional
 from app.services.rules_engine.unit_normalizer import normalize_to_base_unit, normalize_unit
 
 
-def lookup_table_1_min_height(quantity_value: float, unit: str) -> float:
+def lookup_table_1_min_height(
+    quantity_value: float,
+    unit: str,
+    thresholds: Optional[List[dict]] = None
+) -> float:
     """
     Rule 7(2), Table I: Minimum height of numerals and letters based on Net Quantity.
-    Returns required height in mm.
+    Returns required height in mm. Uses JSON thresholds if supplied.
     """
     base_val, base_unit = normalize_to_base_unit(quantity_value, unit)
     if base_val is None:
         return 1.0
+
+    if thresholds:
+        for t in thresholds:
+            max_q = t.get("max_quantity")
+            min_h = float(t.get("min_height_mm", 1.0))
+            if max_q is None or base_val <= float(max_q):
+                return min_h
 
     if base_val <= 50.0:
         return 1.0
@@ -22,21 +33,36 @@ def lookup_table_1_min_height(quantity_value: float, unit: str) -> float:
         return 6.0
 
 
-def lookup_table_2_min_height(pdp_area_sq_cm: float, is_embossed: bool = False) -> float:
+def lookup_table_2_min_height(
+    pdp_area_sq_cm: float,
+    is_embossed: bool = False,
+    thresholds: Optional[List[dict]] = None,
+    embossed_multiplier: float = 2.0
+) -> float:
     """
     Rule 7(2), Table II: Minimum height of numerals and letters based on PDP Area.
     Heights roughly double for blown, moulded, or embossed surfaces.
+    Uses JSON thresholds if supplied.
     """
-    if pdp_area_sq_cm <= 50.0:
-        base = 1.0
-    elif pdp_area_sq_cm <= 100.0:
-        base = 1.5
-    elif pdp_area_sq_cm <= 500.0:
-        base = 2.0
-    else:
+    if thresholds:
         base = 4.0
+        for t in thresholds:
+            max_a = t.get("max_pdp_area_sq_cm")
+            min_h = float(t.get("min_height_mm", 1.0))
+            if max_a is None or pdp_area_sq_cm <= float(max_a):
+                base = min_h
+                break
+    else:
+        if pdp_area_sq_cm <= 50.0:
+            base = 1.0
+        elif pdp_area_sq_cm <= 100.0:
+            base = 1.5
+        elif pdp_area_sq_cm <= 500.0:
+            base = 2.0
+        else:
+            base = 4.0
 
-    return base * 2.0 if is_embossed else base
+    return base * embossed_multiplier if is_embossed else base
 
 
 # Second Schedule (Rule 5) Permitted Standard Sizes (in grams or millilitres)
@@ -72,16 +98,22 @@ SECOND_SCHEDULE_STANDARDS: Dict[str, List[float]] = {
 }
 
 
-def is_second_schedule_standard_size(category: str, quantity_value: float, unit: str) -> bool:
+def is_second_schedule_standard_size(
+    category: str,
+    quantity_value: float,
+    unit: str,
+    standards_catalog: Optional[Dict[str, List[float]]] = None
+) -> bool:
     cat = category.lower().strip().replace(" ", "_").replace("-", "_")
-    if cat not in SECOND_SCHEDULE_STANDARDS:
+    standards = standards_catalog if standards_catalog is not None else SECOND_SCHEDULE_STANDARDS
+    if cat not in standards:
         return True  # Not a strictly scheduled commodity
 
     base_val, _ = normalize_to_base_unit(quantity_value, unit)
     if base_val is None:
         return True
 
-    allowed_list = SECOND_SCHEDULE_STANDARDS[cat]
+    allowed_list = standards[cat]
     if base_val in allowed_list:
         return True
 

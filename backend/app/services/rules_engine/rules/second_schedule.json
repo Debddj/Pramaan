@@ -6,6 +6,35 @@
     "applies_when": "scheduled_category",
     "check_type": "whitelist_or_declared_exception",
     "severity": "moderate",
-    "violation_template": "Declared quantity {quantity} is not an approved standard pack size for {category} under the Second Schedule, and lacks mandatory 'Not a standard pack size' declaration"
+    "violation_template": "Declared quantity {quantity} is not an approved standard pack size for {category} under the Second Schedule, and lacks mandatory 'Not a standard pack size' declaration",
+    "standard_sizes": {
+      "baby_food": [100.0, 200.0, 400.0, 500.0, 1000.0],
+      "biscuits": [25.0, 50.0, 75.0, 100.0, 150.0, 200.0, 250.0, 300.0],
+      "bread": [100.0, 200.0, 400.0, 800.0],
+      "butter": [25.0, 50.0, 100.0, 200.0, 500.0],
+      "tea": [25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
+      "coffee": [25.0, 50.0, 100.0, 200.0, 500.0, 1000.0],
+      "edible_oil": [50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0, 5000.0],
+      "milk_powder": [100.0, 200.0, 500.0, 1000.0],
+      "soaps": [25.0, 50.0, 75.0, 100.0, 125.0, 150.0],
+      "detergent": [50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 3000.0, 5000.0],
+      "pulses": [100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0],
+      "atta": [500.0, 1000.0, 2000.0, 5000.0, 10000.0],
+      "maida": [500.0, 1000.0, 2000.0, 5000.0],
+      "suji": [500.0, 1000.0, 2000.0, 5000.0],
+      "rice": [1000.0, 2000.0, 5000.0, 10000.0, 25000.0],
+      "salt": [100.0, 200.0, 500.0, 1000.0],
+      "spices": [25.0, 50.0, 100.0, 200.0, 500.0, 1000.0],
+      "ghee": [50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0],
+      "toothpaste": [25.0, 50.0, 100.0, 150.0, 200.0],
+      "hair_oil": [25.0, 50.0, 100.0, 200.0, 500.0, 1000.0],
+      "cement": [1000.0, 5000.0, 25000.0, 50000.0],
+      "paint": [50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 4000.0, 10000.0, 20000.0],
+      "varnish": [50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 4000.0],
+      "noodles": [50.0, 70.0, 100.0, 140.0, 280.0, 500.0],
+      "aerated_beverage": [150.0, 200.0, 250.0, 300.0, 330.0, 500.0, 600.0, 750.0, 1000.0, 1250.0, 1500.0, 2000.0],
+      "mineral_water": [200.0, 250.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0, 5000.0],
+      "fruit_juice": [100.0, 200.0, 250.0, 500.0, 1000.0, 1500.0, 2000.0]
+    }
   }
 ]

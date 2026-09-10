@@ -39,6 +39,7 @@ def test_pdf_rendering_escapes_xss():
 
     doc_bytes = generate_pdf_report(report)
     assert len(doc_bytes) > 0
+    assert doc_bytes.startswith(b"%PDF-")
 
 
 def test_pdf_rendering_contains_real_evidence_data():

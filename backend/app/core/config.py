@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     RULES_ENGINE_VERSION: str = "2.0.0"
     RULES_EFFECTIVE_DATE: str = "2024-01-01"
 
+    # ---------- Database Seeding ----------
+    AUTO_SEED_DEMO_DATA: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
 

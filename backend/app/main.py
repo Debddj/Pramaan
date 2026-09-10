@@ -11,10 +11,11 @@ from app.db.init_db import init as seed_initial_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB tables & default seed data on startup
+    # Initialize DB tables; gate demo seed data behind settings.AUTO_SEED_DEMO_DATA
     try:
         Base.metadata.create_all(bind=engine)
-        seed_initial_data()
+        if settings.AUTO_SEED_DEMO_DATA:
+            seed_initial_data()
     except Exception as exc:
         print(f"[Pramaan Startup Warning] DB auto-initialization: {exc}")
     yield

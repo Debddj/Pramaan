@@ -1,7 +1,7 @@
 import re
 from typing import Optional, Dict, Any
 from app.schemas.scan import LabelDeclaration
-from app.services.classification.category_classifier import COMMODITY_KEYWORDS
+from app.services.classification.category_classifier import COMMODITY_KEYWORDS, classify_commodity_category
 
 class EntityParser:
     """
@@ -54,6 +54,16 @@ class EntityParser:
         if phone_match:
             decl.consumer_care_phone = phone_match.group(1)
 
+        care_name_pattern = r'(?:contact|write to|grievance)[\s.:]*(?:our\s*)?([A-Za-z\s]+?(?:manager|executive|officer|cell|desk|department))'
+        care_name_match = re.search(care_name_pattern, text, re.IGNORECASE)
+        if care_name_match:
+            decl.consumer_care_name = care_name_match.group(1).strip().title()
+        elif decl.consumer_care_email or decl.consumer_care_phone:
+            decl.consumer_care_name = "Consumer Care Cell"
+
+        if decl.manufacturer_address:
+            decl.consumer_care_address = decl.manufacturer_address
+
         # 5. Manufacturer / Packer — parse BOTH name AND address from text
         mfg_pattern = r'(?:mfd\s*by|manufactured\s*by|packed\s*by|marketed\s*by)[\s.:]*(.+?)(?:\n|\r|$)'
         mfg_match = re.search(mfg_pattern, text, re.IGNORECASE)
@@ -64,8 +74,10 @@ class EntityParser:
             decl.manufacturer_name = parts[0].strip()
             if len(parts) > 1:
                 decl.manufacturer_address = parts[1].strip()
+                if not decl.consumer_care_address:
+                    decl.consumer_care_address = decl.manufacturer_address
 
-        # 6. Generic name fallback via COMMODITY_KEYWORDS across all 27 categories
+        # 6. Generic name fallback via classify_commodity_category across all 27 categories (with fuzzy & Hindi support)
         CATEGORY_CANONICAL_NAMES = {
             "biscuits": "Biscuits",
             "soaps": "Toilet Soap",
@@ -96,14 +108,9 @@ class EntityParser:
             "fruit_juice": "Fruit Juice",
         }
 
-        t_low = text.lower()
-        for cat_name, keywords in COMMODITY_KEYWORDS.items():
-            for kw in keywords:
-                if kw in t_low:
-                    decl.generic_name = CATEGORY_CANONICAL_NAMES.get(cat_name, cat_name.replace('_', ' ').title())
-                    break
-            if decl.generic_name:
-                break
+        detected_category = classify_commodity_category(text)
+        if detected_category != "general":
+            decl.generic_name = CATEGORY_CANONICAL_NAMES.get(detected_category, detected_category.replace('_', ' ').title())
 
         return decl
 

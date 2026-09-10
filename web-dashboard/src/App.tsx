@@ -86,7 +86,7 @@ export default function App() {
         setOfficerSession(session);
         fetchMetrics();
         fetchReviewQueue();
-        handleSimulate('normal', false);
+        // BUG-008: Do not automatically simulate scan on app mount
       } else {
         setOfficerSession(null);
         setIsLoginModalOpen(true);
@@ -96,6 +96,7 @@ export default function App() {
       setIsLoginModalOpen(true);
     }
   }, []);
+
 
   useEffect(() => {
     initApp();
@@ -309,7 +310,7 @@ export default function App() {
     addToast('success', `Logged in as ${session.name} (Badge: ${session.badge_number})`, 'Officer Authenticated');
     fetchMetrics();
     fetchReviewQueue();
-    handleSimulate('normal', false);
+    // BUG-008: Do not automatically simulate scan on login
   };
 
   const handleLogout = () => {
@@ -773,25 +774,27 @@ export default function App() {
 
                       <div>
                         <span className="text-slate-400 block text-[11px]">GS1 EAN-13 Barcode</span>
-                        <span className="font-mono text-slate-200">{currentScan.barcode || '8901030000001'}</span>
+                        <span className="font-mono text-slate-200">{currentScan.barcode || <span className="text-slate-500 italic">None Detected</span>}</span>
                       </div>
 
                       <div>
                         <span className="text-slate-400 block text-[11px]">Commodity Classification</span>
                         <span className="text-slate-200 capitalize">
-                          {currentScan.extracted_declarations.generic_name || 'Biscuits'} (Packaged Commodity)
+                          {currentScan.extracted_declarations.generic_name ? `${currentScan.extracted_declarations.generic_name} (Packaged Commodity)` : <span className="text-amber-400/80 italic">Unclassified Package</span>}
                         </span>
                       </div>
 
                       <div>
                         <span className="text-slate-400 block text-[11px]">Principal Display Panel Area</span>
-                        <span className="font-mono text-slate-200">{currentScan.pdp_area_sq_cm || 150.0} cm²</span>
+                        <span className="font-mono text-slate-200">
+                          {currentScan.pdp_area_sq_cm ? `${currentScan.pdp_area_sq_cm} cm²` : <span className="text-slate-500 italic">Not Specified</span>}
+                        </span>
                       </div>
 
                       <div>
                         <span className="text-slate-400 block text-[11px]">Optical Scale Factor</span>
                         <span className="font-mono text-slate-200">
-                          {currentScan.scale_factor_mm_per_px?.toFixed(4) || '0.0500'} mm/px
+                          {currentScan.scale_factor_mm_per_px ? `${currentScan.scale_factor_mm_per_px.toFixed(4)} mm/px` : <span className="text-rose-400/80 italic">Uncalibrated</span>}
                         </span>
                       </div>
 
@@ -804,12 +807,13 @@ export default function App() {
 
                       <div>
                         <span className="text-slate-400 block text-[11px]">Cryptographic SHA-256 Hash</span>
-                        <span className="font-mono text-[10px] text-slate-500 break-all">
-                          {currentScan.sha256_hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
+                        <span className="font-mono text-[10px] text-slate-400 break-all">
+                          {currentScan.sha256_hash || <span className="text-slate-500 italic">Pending image upload</span>}
                         </span>
                       </div>
                     </div>
                   </div>
+
 
                   {/* Metrology Explanation Callout (Section 16) */}
                   <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-xs space-y-1.5">
@@ -879,12 +883,14 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <div>
                             <span className="font-['Plus_Jakarta_Sans'] font-black text-sm tracking-tight text-amber-400">
-                              BRITANNIA Good Day
+                              {currentScan.extracted_declarations.manufacturer_name || 'Packaging Front Panel'}
                             </span>
-                            <span className="text-[10px] text-slate-400 block font-sans">Rich Cashew Cookies</span>
+                            <span className="text-[10px] text-slate-400 block font-sans">
+                              {currentScan.extracted_declarations.generic_name || 'Declared Commodity Package'}
+                            </span>
                           </div>
                           <span className="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono">
-                            PDP: 150 cm²
+                            PDP: {currentScan.pdp_area_sq_cm ? `${currentScan.pdp_area_sq_cm} cm²` : 'Unspecified'}
                           </span>
                         </div>
 
@@ -902,8 +908,8 @@ export default function App() {
                             <span className="text-[10px] text-slate-400 font-sans">Net Quantity:</span>
                             <div className="relative font-mono font-bold text-sm text-slate-100 flex items-center gap-1">
                               <span>
-                                {currentScan.extracted_declarations.net_quantity_value || 100}
-                                {currentScan.extracted_declarations.net_quantity_unit || 'g'}
+                                {currentScan.extracted_declarations.net_quantity_value != null ? currentScan.extracted_declarations.net_quantity_value : '—'}
+                                {currentScan.extracted_declarations.net_quantity_unit || ''}
                               </span>
 
                               {/* Virtual Caliper lines measuring numeral height */}
@@ -913,7 +919,7 @@ export default function App() {
                                     <span className={`text-[9px] font-mono font-bold ${
                                       (currentScan.measured_numeral_height_mm || 0) < 2.0 ? 'text-rose-400' : 'text-emerald-400'
                                     }`}>
-                                      {currentScan.measured_numeral_height_mm?.toFixed(2)}mm
+                                      {currentScan.measured_numeral_height_mm?.toFixed(2) || '0.00'}mm
                                     </span>
                                   </div>
                                 </div>
@@ -930,8 +936,9 @@ export default function App() {
                               ||| | |||| | |||
                             </div>
                             <span className="text-[8px] font-mono text-slate-400 block text-center mt-0.5">
-                              {currentScan.barcode || '8901030000001'}
+                              {currentScan.barcode || 'No Barcode Detected'}
                             </span>
+
 
                             {/* Barcode reference measurement caliper */}
                             {showBoundingBox && (
@@ -981,38 +988,73 @@ export default function App() {
                       <div className="divide-y divide-slate-800 text-xs">
                         <div className="py-1.5 flex items-center justify-between">
                           <span className="text-slate-400">Manufacturer</span>
-                          <span className="text-slate-200 font-medium flex items-center gap-1">
-                            {currentScan.extracted_declarations.manufacturer_name || 'Britannia Industries Ltd'}
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          </span>
+                          {currentScan.extracted_declarations.manufacturer_name ? (
+                            <span className="text-slate-200 font-medium flex items-center gap-1">
+                              {currentScan.extracted_declarations.manufacturer_name}
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 font-mono text-[11px] flex items-center gap-1">
+                              Not Detected
+                              <AlertOctagon className="w-3.5 h-3.5 text-rose-400" />
+                            </span>
+                          )}
                         </div>
                         <div className="py-1.5 flex items-center justify-between">
                           <span className="text-slate-400">Generic Name</span>
-                          <span className="text-slate-200 font-medium flex items-center gap-1">
-                            {currentScan.extracted_declarations.generic_name || 'Biscuits'}
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          </span>
+                          {currentScan.extracted_declarations.generic_name ? (
+                            <span className="text-slate-200 font-medium flex items-center gap-1">
+                              {currentScan.extracted_declarations.generic_name}
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 font-mono text-[11px] flex items-center gap-1">
+                              Not Detected
+                              <AlertOctagon className="w-3.5 h-3.5 text-rose-400" />
+                            </span>
+                          )}
                         </div>
                         <div className="py-1.5 flex items-center justify-between">
                           <span className="text-slate-400">Net Quantity</span>
-                          <span className="text-slate-200 font-medium flex items-center gap-1">
-                            {currentScan.extracted_declarations.net_quantity_value}{currentScan.extracted_declarations.net_quantity_unit}
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          </span>
+                          {currentScan.extracted_declarations.net_quantity_value != null ? (
+                            <span className="text-slate-200 font-medium flex items-center gap-1">
+                              {currentScan.extracted_declarations.net_quantity_value} {currentScan.extracted_declarations.net_quantity_unit || ''}
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 font-mono text-[11px] flex items-center gap-1">
+                              Not Declared
+                              <AlertOctagon className="w-3.5 h-3.5 text-rose-400" />
+                            </span>
+                          )}
                         </div>
                         <div className="py-1.5 flex items-center justify-between">
                           <span className="text-slate-400">MRP Declaration</span>
-                          <span className="text-slate-200 font-medium flex items-center gap-1">
-                            ₹{currentScan.extracted_declarations.mrp} (Incl. taxes)
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          </span>
+                          {currentScan.extracted_declarations.mrp != null ? (
+                            <span className="text-slate-200 font-medium flex items-center gap-1">
+                              ₹{currentScan.extracted_declarations.mrp} {currentScan.extracted_declarations.is_mrp_inclusive_of_taxes ? '(Incl. taxes)' : '(Taxes unstated)'}
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 font-mono text-[11px] flex items-center gap-1">
+                              Not Declared
+                              <AlertOctagon className="w-3.5 h-3.5 text-rose-400" />
+                            </span>
+                          )}
                         </div>
                         <div className="py-1.5 flex items-center justify-between">
                           <span className="text-slate-400">Consumer Care</span>
-                          <span className="text-slate-200 font-medium flex items-center gap-1">
-                            {currentScan.extracted_declarations.consumer_care_email || 'feedback@britannia.co.in'}
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          </span>
+                          {(currentScan.extracted_declarations.consumer_care_email || currentScan.extracted_declarations.consumer_care_phone) ? (
+                            <span className="text-slate-200 font-medium flex items-center gap-1">
+                              {currentScan.extracted_declarations.consumer_care_email || currentScan.extracted_declarations.consumer_care_phone}
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 font-mono text-[11px] flex items-center gap-1">
+                              Omitted (Rule 6(2))
+                              <AlertOctagon className="w-3.5 h-3.5 text-rose-400" />
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1115,6 +1157,34 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {!currentScan && (
+              <div className="bg-slate-900/60 border border-slate-800/80 border-dashed rounded-2xl p-12 text-center space-y-4 my-8">
+                <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
+                  <Ruler className="w-8 h-8 text-blue-400" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-slate-200">No Active Inspection — Upload Image or Scan Barcode</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Upload physical packaging evidence, scan an EAN-13 barcode, or trigger a benchmark scenario above to launch automated optical metrology verification.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => setIsNewInspectionOpen(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                  >
+                    + Upload Packaging Evidence
+                  </button>
+                  <button
+                    onClick={() => handleSimulate('normal')}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700 transition"
+                  >
+                    Simulate Demo Package
+                  </button>
                 </div>
               </div>
             )}

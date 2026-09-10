@@ -24,6 +24,7 @@ class AuditService:
         before_state: Optional[Any] = None,
         after_state: Optional[Any] = None,
         reason: Optional[str] = None,
+        commit: bool = True,
     ) -> AuditLog:
         query = db.query(AuditLog).order_by(AuditLog.id.desc())
         try:
@@ -58,8 +59,11 @@ class AuditService:
             record_hash=record_hash,
         )
         db.add(log_entry)
-        db.commit()
-        db.refresh(log_entry)
+        if commit:
+            db.commit()
+            db.refresh(log_entry)
+        else:
+            db.flush()
         return log_entry
 
     def verify_chain(self, db: Session) -> Tuple[bool, Optional[int]]:

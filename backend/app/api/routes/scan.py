@@ -1,7 +1,8 @@
 import uuid
 import hashlib
 import base64
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -25,7 +26,12 @@ from app.core.config import settings
 router = APIRouter()
 
 
-def _compute_extraction_confidence(decl: LabelDeclaration) -> float:
+def _compute_composite_confidence(
+    decl: LabelDeclaration,
+    quality: Optional[Any],
+    is_calibrated: bool,
+    is_checksum_valid: Optional[bool],
+) -> float:
     expected_fields = [
         decl.manufacturer_name,
         decl.manufacturer_address,
@@ -36,7 +42,28 @@ def _compute_extraction_confidence(decl: LabelDeclaration) -> float:
         decl.mrp,
     ]
     present = sum(1 for f in expected_fields if f is not None)
-    return round(present / len(expected_fields), 2)
+    field_score = present / len(expected_fields)
+
+    # CV Quality score
+    quality_score = 0.5
+    if quality is not None:
+        quality_score = 1.0 if quality.is_acceptable else 0.3
+        if getattr(quality, "has_glare", False):
+            quality_score -= 0.2
+        if getattr(quality, "is_blurry", False):
+            quality_score -= 0.3
+        quality_score = max(0.1, min(1.0, quality_score))
+
+    # Calibration & Checksum score
+    if is_calibrated and is_checksum_valid is True:
+        calib_score = 1.0
+    elif is_calibrated:
+        calib_score = 0.7
+    else:
+        calib_score = 0.2
+
+    composite = (0.4 * field_score) + (0.3 * quality_score) + (0.3 * calib_score)
+    return round(max(0.05, min(1.0, composite)), 2)
 
 
 def _process_scan_core(
@@ -53,6 +80,7 @@ def _process_scan_core(
     scan_uuid = f"PRM-{uuid.uuid4().hex[:8].upper()}"
     image_url: Optional[str] = None
     image_b64: Optional[str] = None
+    authoritative_cv = bool(image_bytes and len(image_bytes) > 0)
 
     # 1. Image Storage & Content Hashing
     if image_bytes:
@@ -60,6 +88,47 @@ def _process_scan_core(
         sha256_hash = record.sha256_hash
         image_url = record.data_uri or record.path
         image_b64 = record.base64_data
+
+        # BUG-022: Idempotent duplicate check within 5 minutes
+        recent_duplicate = (
+            db.query(Scan)
+            .filter(Scan.image_hash_sha256 == sha256_hash, Scan.officer_id == current_user.id)
+            .order_by(Scan.id.desc())
+            .first()
+        )
+        if recent_duplicate and (datetime.utcnow() - recent_duplicate.created_at).total_seconds() < 300:
+            existing_violations = [
+                ViolationOut(
+                    rule_id=v.rule_id,
+                    citation=v.citation,
+                    severity=v.severity,
+                    measured_value=v.measured_value,
+                    required_value=v.required_value,
+                    violation_text=v.violation_text,
+                )
+                for v in db.query(Violation).filter_by(scan_id=recent_duplicate.id).all()
+            ]
+            return ScanResult(
+                scan_uuid=recent_duplicate.scan_uuid,
+                barcode=recent_duplicate.barcode,
+                status=recent_duplicate.status,
+                overall_confidence=recent_duplicate.extraction_confidence or 0.0,
+                needs_review=recent_duplicate.needs_review,
+                is_calibrated=bool(recent_duplicate.scale_factor_mm_per_px),
+                calibration_status="calibrated" if recent_duplicate.scale_factor_mm_per_px else "uncalibrated",
+                is_checksum_valid=validate_ean13_checksum(recent_duplicate.barcode or ""),
+                calibration_note="Duplicate inspection: cached evidence returned",
+                authoritative_cv=bool(recent_duplicate.image_data_base64),
+                is_duplicate=True,
+                scale_factor_mm_per_px=recent_duplicate.scale_factor_mm_per_px,
+                pdp_area_sq_cm=recent_duplicate.pdp_area_sq_cm,
+                measured_numeral_height_mm=recent_duplicate.measured_numeral_height_mm,
+                extracted_declarations=LabelDeclaration(**(recent_duplicate.extracted_data or {})),
+                violations=existing_violations,
+                sha256_hash=recent_duplicate.image_hash_sha256,
+                image_url=recent_duplicate.image_path,
+                timestamp=recent_duplicate.created_at,
+            )
     else:
         sha256_hash = hashlib.sha256(scan_uuid.encode()).hexdigest()
 
@@ -82,7 +151,7 @@ def _process_scan_core(
     if barcode and is_checksum_valid is None:
         is_checksum_valid = validate_ean13_checksum(barcode)
 
-    # Determine calibration status without fabricating values
+    # BUG-002 & BUG-004: Strict Metrology Enforcement
     is_calibrated = False
     calibration_status = "uncalibrated"
     calibration_note = None
@@ -91,6 +160,18 @@ def _process_scan_core(
 
     if detected_barcode_width_px and detected_barcode_width_px > 0:
         scale_factor = calibrator.compute_scale_factor(detected_barcode_width_px)
+
+    if not authoritative_cv and not raw_ocr_text:
+        # BUG-002: Client measurements without image cannot be authoritatively certified
+        calibration_status = "uncalibrated"
+        calibration_note = "Non-authoritative: no packaging image provided for server-side verification."
+    elif is_checksum_valid is False:
+        # BUG-004: Checksum failed -> Barcode rejected as physical reference ruler
+        is_calibrated = False
+        measured_height_mm = None
+        calibration_status = "uncalibrated"
+        calibration_note = "Barcode checksum validation failed: invalid EAN-13 check digit. Barcode rejected as physical reference ruler."
+    elif scale_factor and scale_factor > 0:
         if detected_text_height_px and detected_text_height_px > 0:
             measured_height_mm = calibrator.measure_height_mm(detected_text_height_px, scale_factor)
             is_calibrated = True
@@ -101,6 +182,7 @@ def _process_scan_core(
     else:
         calibration_status = "uncalibrated"
         calibration_note = "No standard EAN-13 barcode detected on packaging for optical calibration"
+
 
     pdp_area = pdp_area_sq_cm or 150.0
 
@@ -123,8 +205,13 @@ def _process_scan_core(
         contrast_ratio=contrast_ratio,
     )
 
-    # 6. Confidence & Triage Assessment
-    overall_confidence = _compute_extraction_confidence(extracted_decl)
+    # 6. BUG-016: Calibrated Composite Confidence & Triage Assessment
+    overall_confidence = _compute_composite_confidence(
+        decl=extracted_decl,
+        quality=quality,
+        is_calibrated=is_calibrated,
+        is_checksum_valid=is_checksum_valid,
+    )
     needs_review = (
         (overall_confidence < settings.TRIAGE_CONFIDENCE_THRESHOLD)
         or (quality is not None and not quality.is_acceptable)
@@ -132,7 +219,7 @@ def _process_scan_core(
     )
     final_status = "under_review" if needs_review else status_result
 
-    # 7. Database Persistence
+    # 7. BUG-021: Atomic Database Persistence
     db_scan = Scan(
         scan_uuid=scan_uuid,
         officer_id=current_user.id,
@@ -150,8 +237,7 @@ def _process_scan_core(
         extracted_data=extracted_decl.model_dump(),
     )
     db.add(db_scan)
-    db.commit()
-    db.refresh(db_scan)
+    db.flush()
 
     for v in violations:
         db_v = Violation(
@@ -164,9 +250,8 @@ def _process_scan_core(
             violation_text=v.violation_text,
         )
         db.add(db_v)
-    db.commit()
 
-    # 8. Append-Only Audit Trail
+    # 8. Append-Only Audit Trail (atomic with transaction)
     audit_service.log_action(
         db=db,
         officer_id=current_user.id,
@@ -179,7 +264,10 @@ def _process_scan_core(
             "violations_count": len(violations),
             "is_calibrated": is_calibrated,
         },
+        commit=False,
     )
+    db.commit()
+    db.refresh(db_scan)
 
     return ScanResult(
         scan_uuid=scan_uuid,
@@ -191,6 +279,8 @@ def _process_scan_core(
         calibration_status=calibration_status,
         is_checksum_valid=is_checksum_valid,
         calibration_note=calibration_note,
+        authoritative_cv=authoritative_cv,
+        is_duplicate=False,
         scale_factor_mm_per_px=scale_factor,
         pdp_area_sq_cm=pdp_area,
         measured_numeral_height_mm=measured_height_mm,

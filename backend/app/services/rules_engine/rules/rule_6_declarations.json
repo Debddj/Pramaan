@@ -51,6 +51,42 @@
     "applies_when": "always",
     "check_type": "presence",
     "severity": "critical",
-    "violation_template": "Consumer care name, telephone, or email contact is completely omitted under Rule 6(2)"
+    "violation_template": "Consumer care declaration incomplete under Rule 6(2). Missing required fields: {missing_fields}"
+  },
+  {
+    "rule_id": "LMPC-R6-2-NAME",
+    "citation": "Rule 6(2)",
+    "requirement": "consumer_care_person_or_office_name",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Designated person/office name for consumer complaints is missing under Rule 6(2)"
+  },
+  {
+    "rule_id": "LMPC-R6-2-PHONE",
+    "citation": "Rule 6(2)",
+    "requirement": "consumer_care_telephone",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Consumer grievance telephone number is missing under Rule 6(2)"
+  },
+  {
+    "rule_id": "LMPC-R6-2-EMAIL",
+    "citation": "Rule 6(2)",
+    "requirement": "consumer_care_email_address",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Consumer grievance email address is missing under Rule 6(2)"
+  },
+  {
+    "rule_id": "LMPC-R6-2-ADDRESS",
+    "citation": "Rule 6(2)",
+    "requirement": "consumer_care_postal_address",
+    "applies_when": "always",
+    "check_type": "presence",
+    "severity": "critical",
+    "violation_template": "Consumer grievance contact address is missing under Rule 6(2)"
   }
 ]

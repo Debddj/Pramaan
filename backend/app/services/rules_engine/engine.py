@@ -1,6 +1,7 @@
 import json
 import os
 import glob
+import logging
 from typing import List, Dict, Any, Tuple, Optional
 from app.schemas.scan import LabelDeclaration, ViolationOut
 from app.services.rules_engine.unit_normalizer import normalize_to_base_unit, normalize_unit
@@ -9,6 +10,8 @@ from app.services.rules_engine.lookup_tables import (
     lookup_table_2_min_height,
     is_second_schedule_standard_size
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RulesEngine:
@@ -23,10 +26,17 @@ class RulesEngine:
         self._load_rules()
 
     def _load_rules(self):
-        """Loads and indexes all external JSON rule files."""
+        """Loads and indexes all external JSON rule files. Fails fast on corrupted definitions."""
         if not os.path.exists(self.rules_dir):
-            return
-        for file_path in glob.glob(os.path.join(self.rules_dir, "*.json")):
+            logger.error(f"Statutory rules directory does not exist: {self.rules_dir}")
+            raise RuntimeError(f"Statutory rules directory missing: {self.rules_dir}")
+
+        json_files = glob.glob(os.path.join(self.rules_dir, "*.json"))
+        if not json_files:
+            logger.error(f"No statutory rule JSON files found in {self.rules_dir}")
+            raise RuntimeError(f"No rule definitions found in {self.rules_dir}")
+
+        for file_path in json_files:
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -35,8 +45,13 @@ class RulesEngine:
                             r_id = rule.get("rule_id")
                             if r_id:
                                 self.rules_catalog[r_id] = rule
-            except Exception:
-                pass
+                    elif isinstance(data, dict):
+                        r_id = data.get("rule_id")
+                        if r_id:
+                            self.rules_catalog[r_id] = data
+            except Exception as e:
+                logger.error(f"Failed to load statutory rule file {file_path}: {e}")
+                raise RuntimeError(f"Corrupted or invalid statutory rule definition in {file_path}: {e}") from e
 
     def _create_violation(
         self,
@@ -79,15 +94,18 @@ class RulesEngine:
         is_embossed: bool = False
     ) -> Tuple[str, List[ViolationOut]]:
         """
-        Evaluates extracted packaging declarations against LMPC statutory rules.
+        Evaluates extracted packaging declarations against authoritative LMPC statutory rules.
         Returns: (status: 'compliant' | 'violation' | 'exempt' | 'needs_review', violations: List[ViolationOut])
         """
         violations: List[ViolationOut] = []
 
-        # 1. Rule 26 Exemption Check (<= 10g / 10ml)
+        # 1. Rule 26 Exemption Check (dynamically queried from rule_26_exemptions.json)
+        rule_26 = self.rules_catalog.get("LMPC-R26-A-WEIGHT", {})
+        max_exempt_weight = float(rule_26.get("max_weight_grams", 10.0))
+        exempt_units = rule_26.get("exempt_units", ["g", "ml"])
         if decl.net_quantity_value is not None and decl.net_quantity_unit:
             base_val, base_unit = normalize_to_base_unit(decl.net_quantity_value, decl.net_quantity_unit)
-            if base_val is not None and base_unit in ['g', 'ml'] and base_val <= 10.0:
+            if base_val is not None and base_unit in exempt_units and base_val <= max_exempt_weight:
                 return "exempt", []
 
         # 2. Rule 6(1) Mandatory Declarations
@@ -141,20 +159,74 @@ class RulesEngine:
                 default_template="Retail sale price (MRP) does not state 'inclusive of all taxes' or is missing under Rule 6(1)(e)"
             ))
 
-        # Rule 6(2) Consumer Care
-        if not decl.consumer_care_email and not decl.consumer_care_phone:
+        # Rule 6(2) Consumer Care — Enforce individual presence of name, address, telephone, and email
+        missing_care: List[str] = []
+        if not decl.consumer_care_name:
+            missing_care.append("name")
+        if not decl.consumer_care_phone:
+            missing_care.append("telephone")
+        if not decl.consumer_care_email:
+            missing_care.append("email")
+        if not (decl.consumer_care_address or decl.manufacturer_address):
+            missing_care.append("address")
+
+        if missing_care:
             violations.append(self._create_violation(
                 rule_id="LMPC-R6-2-CARE",
-                measured_value="None detected",
-                required_value="Consumer grievance phone, email, and address",
+                measured_value=f"Missing: {', '.join(missing_care)}",
+                required_value="Name, address, telephone, and email of designated consumer grievance cell",
                 default_citation="Rule 6(2)",
                 default_severity="critical",
-                default_template="Consumer care phone and email contact are completely omitted under Rule 6(2)"
+                default_template="Consumer care declaration incomplete under Rule 6(2). Missing required fields: {missing_fields}",
+                template_kwargs={"missing_fields": ", ".join(missing_care)}
             ))
+            if "name" in missing_care:
+                violations.append(self._create_violation(
+                    rule_id="LMPC-R6-2-NAME",
+                    measured_value="Missing",
+                    required_value="Name of designated person/office",
+                    default_citation="Rule 6(2)",
+                    default_severity="critical",
+                    default_template="Designated person/office name for consumer complaints is missing under Rule 6(2)"
+                ))
+            if "telephone" in missing_care:
+                violations.append(self._create_violation(
+                    rule_id="LMPC-R6-2-PHONE",
+                    measured_value="Missing",
+                    required_value="Consumer care telephone number",
+                    default_citation="Rule 6(2)",
+                    default_severity="critical",
+                    default_template="Consumer grievance telephone number is missing under Rule 6(2)"
+                ))
+            if "email" in missing_care:
+                violations.append(self._create_violation(
+                    rule_id="LMPC-R6-2-EMAIL",
+                    measured_value="Missing",
+                    required_value="Consumer care email address",
+                    default_citation="Rule 6(2)",
+                    default_severity="critical",
+                    default_template="Consumer grievance email address is missing under Rule 6(2)"
+                ))
+            if "address" in missing_care:
+                violations.append(self._create_violation(
+                    rule_id="LMPC-R6-2-ADDRESS",
+                    measured_value="Missing",
+                    required_value="Consumer grievance contact address",
+                    default_citation="Rule 6(2)",
+                    default_severity="critical",
+                    default_template="Consumer grievance contact address is missing under Rule 6(2)"
+                ))
 
-        # 3. Rule 7(2) Minimum Numeral Height Check (Optical Metrology)
+        # 3. Rule 7(2) Minimum Numeral Height Check (Optical Metrology via authoritative JSON thresholds)
+        t1_def = self.rules_catalog.get("LMPC-R7-TABLE-1", {})
+        t1_thresholds = t1_def.get("thresholds")
+
+        t2_def = self.rules_catalog.get("LMPC-R7-TABLE-2", {})
+        t2_thresholds = t2_def.get("thresholds")
+        embossed_mult = float(t2_def.get("embossed_multiplier", 2.0))
+
         if measured_height_mm is not None and decl.net_quantity_value is not None and decl.net_quantity_unit:
-            req_t1 = lookup_table_1_min_height(decl.net_quantity_value, decl.net_quantity_unit)
+            req_t1 = lookup_table_1_min_height(decl.net_quantity_value, decl.net_quantity_unit, thresholds=t1_thresholds)
             if measured_height_mm < req_t1:
                 violations.append(self._create_violation(
                     rule_id="LMPC-R7-TABLE-1",
@@ -171,7 +243,12 @@ class RulesEngine:
                 ))
 
             if pdp_area_sq_cm is not None:
-                req_t2 = lookup_table_2_min_height(pdp_area_sq_cm, is_embossed)
+                req_t2 = lookup_table_2_min_height(
+                    pdp_area_sq_cm,
+                    is_embossed=is_embossed,
+                    thresholds=t2_thresholds,
+                    embossed_multiplier=embossed_mult
+                )
                 if measured_height_mm < req_t2:
                     violations.append(self._create_violation(
                         rule_id="LMPC-R7-TABLE-2",
@@ -197,9 +274,17 @@ class RulesEngine:
                 default_template="Net quantity numeral height could not be verified optically: EAN-13 barcode standard not detected on packaging."
             ))
 
-        # 4. Second Schedule Pack Size Enforcement
+        # 4. Second Schedule Pack Size Enforcement (authoritative JSON standards)
+        sched_def = self.rules_catalog.get("LMPC-R5-SECOND-SCHEDULE", {})
+        standards_catalog = sched_def.get("standard_sizes")
+
         if decl.net_quantity_value is not None and decl.net_quantity_unit and category != "general":
-            is_std = is_second_schedule_standard_size(category, decl.net_quantity_value, decl.net_quantity_unit)
+            is_std = is_second_schedule_standard_size(
+                category,
+                decl.net_quantity_value,
+                decl.net_quantity_unit,
+                standards_catalog=standards_catalog
+            )
             has_exception = "not a standard pack size" in (decl.raw_ocr_text or "").lower()
             if not is_std and not has_exception:
                 violations.append(self._create_violation(
@@ -215,16 +300,18 @@ class RulesEngine:
                     }
                 ))
 
-        # 5. Rule 9(1)(b) Color Contrast Check
-        if contrast_ratio is not None and contrast_ratio < 3.0:
+        # 5. Rule 9(1)(b) Color Contrast Check (authoritative JSON threshold)
+        contrast_def = self.rules_catalog.get("LMPC-R9-CONTRAST", {})
+        min_contrast = float(contrast_def.get("min_contrast_ratio", 3.0))
+        if contrast_ratio is not None and contrast_ratio < min_contrast:
             violations.append(self._create_violation(
                 rule_id="LMPC-R9-CONTRAST",
                 measured_value=f"{contrast_ratio:.1f}:1",
-                required_value=">= 3.0:1",
+                required_value=f">= {min_contrast:.1f}:1",
                 default_citation="Rule 9(1)(b)",
                 default_severity="moderate",
-                default_template="Numeral contrast ratio {measured}:1 is below required minimum contrast 3.0:1 under Rule 9(1)(b)",
-                template_kwargs={"measured": f"{contrast_ratio:.1f}"}
+                default_template="Numeral contrast ratio {measured}:1 is below required minimum contrast {required}:1 under Rule 9(1)(b)",
+                template_kwargs={"measured": f"{contrast_ratio:.1f}", "required": f"{min_contrast:.1f}"}
             ))
 
         status = "violation" if violations else "compliant"
@@ -232,3 +319,4 @@ class RulesEngine:
 
 
 engine_instance = RulesEngine()
+

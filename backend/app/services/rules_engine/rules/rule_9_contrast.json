@@ -6,6 +6,7 @@
     "applies_when": "always",
     "check_type": "contrast_ratio_min",
     "severity": "moderate",
-    "violation_template": "Numeral contrast ratio {measured}:1 is below required minimum contrast 3.0:1 under Rule 9(1)(b)"
+    "violation_template": "Numeral contrast ratio {measured}:1 is below required minimum contrast 3.0:1 under Rule 9(1)(b)",
+    "min_contrast_ratio": 3.0
   }
 ]
