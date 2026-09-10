@@ -9,7 +9,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port 10000"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
@@ -20,6 +20,8 @@ services:
           property: connectionString
       - key: STORAGE_BACKEND
         value: local
+      - key: AUTO_SEED_DEMO_DATA
+        value: "true"
       - key: TRIAGE_CONFIDENCE_THRESHOLD
         value: "0.85"
       - key: GEMINI_MODEL
@@ -35,8 +37,6 @@ services:
   - type: web
     name: pramaan-dashboard
     env: static
-    region: oregon
-    plan: free
     rootDir: web-dashboard
     buildCommand: "npm install && npm run build"
     staticPublishPath: ./dist
