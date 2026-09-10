@@ -1,4 +1,4 @@
-﻿fastapi>=0.110.0
+fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
@@ -19,6 +19,7 @@ google-genai>=1.0.0
 
 # Phase 1C — Real PDF generation
 weasyprint>=62.0
+reportlab>=4.0.0
 
 # Phase 2D — Rate limiting
 slowapi>=0.1.9
