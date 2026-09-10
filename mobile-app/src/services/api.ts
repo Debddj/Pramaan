@@ -6,7 +6,7 @@ declare const process: { env: Record<string, string | undefined> };
 // Default to Cloud backend URL if env is set, or cloud production URL.
 // Can be dynamically changed at runtime via setBaseUrl().
 export const DEFAULT_API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "https://pramaan-backend.onrender.com/api/v1";
+  process.env.EXPO_PUBLIC_API_URL || "https://pramaan-backend-rct0.onrender.com/api/v1";
 
 let currentBaseUrl: string = DEFAULT_API_URL;
 let authToken: string | null = null;

@@ -46,7 +46,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://pramaan-backend.onrender.com/api/v1
+        value: https://pramaan-backend-rct0.onrender.com/api/v1
 
 databases:
   # -------------------------------------------------------------
