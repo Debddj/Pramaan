@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -6,8 +6,18 @@ from app.api.routes import health, scan, review_queue, dashboard, reports, auth,
 from app.middleware.rate_limiter import limiter, _rate_limit_exceeded_handler, RateLimitExceeded
 from app.middleware.logging_middleware import StructuredLoggingMiddleware
 
-# Initialize DB tables
-Base.metadata.create_all(bind=engine)
+from contextlib import asynccontextmanager
+from app.db.init_db import init as seed_initial_data
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB tables & default seed data on startup
+    try:
+        Base.metadata.create_all(bind=engine)
+        seed_initial_data()
+    except Exception as exc:
+        print(f"[Pramaan Startup Warning] DB auto-initialization: {exc}")
+    yield
 
 # Optional Sentry initialization
 if settings.SENTRY_DSN:
@@ -20,7 +30,8 @@ if settings.SENTRY_DSN:
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Automated Legal Metrology AI Inspection Engine & Enforcement Suite (SIH26034)"
+    description="Automated Legal Metrology AI Inspection Engine & Enforcement Suite (SIH26034)",
+    lifespan=lifespan,
 )
 
 # SlowAPI Rate Limiter

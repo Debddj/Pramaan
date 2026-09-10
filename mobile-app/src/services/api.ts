@@ -1,8 +1,26 @@
-﻿import axios from "axios";
+import axios from "axios";
 
-const API_BASE_URL = "http://10.0.2.2:8000/api/v1"; // Android emulator localhost alias; use local IP on physical devices
+// Default to Cloud backend URL if env is set, or cloud production URL.
+// Can be dynamically changed at runtime via setBaseUrl().
+export const DEFAULT_API_URL =
+  process.env.EXPO_PUBLIC_API_URL || "https://pramaan-backend.onrender.com/api/v1";
 
+let currentBaseUrl: string = DEFAULT_API_URL;
 let authToken: string | null = null;
+
+export const getBaseUrl = (): string => currentBaseUrl;
+
+export const setBaseUrl = (url: string): void => {
+  let formatted = url.trim();
+  if (formatted.endsWith("/")) {
+    formatted = formatted.slice(0, -1);
+  }
+  if (!formatted.endsWith("/api/v1")) {
+    formatted = `${formatted}/api/v1`;
+  }
+  currentBaseUrl = formatted;
+  apiClient.defaults.baseURL = currentBaseUrl;
+};
 
 export const setAuthToken = (token: string | null) => {
   authToken = token;
@@ -11,7 +29,7 @@ export const setAuthToken = (token: string | null) => {
 export const getAuthToken = () => authToken;
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: currentBaseUrl,
   timeout: 30000,
 });
 
@@ -23,6 +41,14 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export const api = {
+  getBaseUrl() {
+    return currentBaseUrl;
+  },
+
+  setBaseUrl(url: string) {
+    setBaseUrl(url);
+  },
+
   async login(email: string, password: string) {
     const res = await apiClient.post("/auth/login", { email, password });
     if (res.data?.access_token) {
@@ -31,10 +57,32 @@ export const api = {
     return res.data;
   },
 
-  async uploadScan(formData: FormData) {
-    const res = await apiClient.post("/scan/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+  /**
+   * Dual-mode scan handler:
+   * - If passed a FormData object (multipart file from camera), dispatches to /scan/upload.
+   * - If passed a JSON object (statutory parameters / OCR text), dispatches to /scan.
+   */
+  async uploadScan(data: any) {
+    const isFormData =
+      data instanceof FormData ||
+      (typeof data === "object" && data !== null && typeof (data as any).append === "function");
+
+    if (isFormData) {
+      const res = await apiClient.post("/scan/upload", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    } else {
+      const res = await apiClient.post("/scan", data);
+      return res.data;
+    }
+  },
+
+  /**
+   * Direct JSON scan inspection (EAN-13, OCR text, pixel metrology).
+   */
+  async scanDirect(payload: any) {
+    const res = await apiClient.post("/scan", payload);
     return res.data;
   },
 
@@ -43,7 +91,27 @@ export const api = {
     return res.data;
   },
 
+  async testConnection(): Promise<{ ok: boolean; message: string; latencyMs: number }> {
+    const start = Date.now();
+    try {
+      const res = await apiClient.get("/health", { timeout: 8000 });
+      const latencyMs = Date.now() - start;
+      return {
+        ok: true,
+        message: res.data?.service || "Connected to Pramaan API",
+        latencyMs,
+      };
+    } catch (err: any) {
+      const latencyMs = Date.now() - start;
+      return {
+        ok: false,
+        message: err.response?.data?.detail || err.message || "Failed to reach server",
+        latencyMs,
+      };
+    }
+  },
+
   getNoticeUrl(scanUuid: string) {
-    return `${API_BASE_URL}/reports/${scanUuid}/pdf`;
+    return `${currentBaseUrl}/reports/${scanUuid}/pdf`;
   },
 };

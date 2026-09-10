@@ -1,0 +1,59 @@
+services:
+  # -------------------------------------------------------------
+  # 1. FastAPI Legal Metrology Backend API Service
+  # -------------------------------------------------------------
+  - type: web
+    name: pramaan-backend
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port 10000"
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pramaan-db
+          property: connectionString
+      - key: STORAGE_BACKEND
+        value: local
+      - key: TRIAGE_CONFIDENCE_THRESHOLD
+        value: "0.85"
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+
+  # -------------------------------------------------------------
+  # 2. Vite + React Statutory Enforcement Web Dashboard
+  # -------------------------------------------------------------
+  - type: web
+    name: pramaan-dashboard
+    env: static
+    region: oregon
+    plan: free
+    rootDir: web-dashboard
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://pramaan-backend.onrender.com/api/v1
+
+databases:
+  # -------------------------------------------------------------
+  # 3. Managed PostgreSQL Database
+  # -------------------------------------------------------------
+  - name: pramaan-db
+    region: oregon
+    plan: free
+    databaseName: pramaan
+    user: pramaan
