@@ -4,7 +4,7 @@ services:
   # -------------------------------------------------------------
   - type: web
     name: pramaan-backend
-    env: python
+    runtime: python
     region: oregon
     plan: free
     rootDir: backend
@@ -36,7 +36,7 @@ services:
   # -------------------------------------------------------------
   - type: web
     name: pramaan-dashboard
-    env: static
+    runtime: static
     rootDir: web-dashboard
     buildCommand: "npm install && npm run build"
     staticPublishPath: ./dist
