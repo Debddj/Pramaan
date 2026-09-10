@@ -1,5 +1,8 @@
 import axios from "axios";
 
+// Ambient declaration for Expo process.env in React Native
+declare const process: { env: Record<string, string | undefined> };
+
 // Default to Cloud backend URL if env is set, or cloud production URL.
 // Can be dynamically changed at runtime via setBaseUrl().
 export const DEFAULT_API_URL =
@@ -33,7 +36,7 @@ const apiClient = axios.create({
   timeout: 30000,
 });
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use((config: any) => {
   if (authToken) {
     config.headers.Authorization = `Bearer ${authToken}`;
   }
