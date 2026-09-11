@@ -1,15 +1,34 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Scale, AlertTriangle, BarChart3, PlusCircle, LogOut, KeyRound, Search } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Plus,
+  ShieldCheck,
+  LogOut,
+  Key,
+  Menu,
+  X
+} from 'lucide-react';
 import { OfficerSession } from '../api/types';
+import { LogoIcon } from './LogoIcon';
+
+export type NavTab =
+  | 'dashboard'
+  | 'adjudication'
+  | 'scanner'
+  | 'review'
+  | 'history'
+  | 'reports'
+  | 'surveillance';
 
 interface NavbarProps {
-  activeTab: string;
-  setActiveTab: (tab: 'dashboard' | 'adjudication' | 'review' | 'repository') => void;
+  activeTab: NavTab;
+  setActiveTab: (tab: NavTab) => void;
   reviewCount: number;
   officerSession: OfficerSession | null;
   onOpenNewInspection: () => void;
   onReLogin: () => void;
   onLogout: () => void;
+  isBackendHealthy?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -20,168 +39,217 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewInspection,
   onReLogin,
   onLogout,
+  isBackendHealthy = true,
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks: Array<{ id: NavTab; label: string; badge?: number }> = [
+    { id: 'dashboard', label: 'Overview' },
+    { id: 'adjudication', label: 'Inspect' },
+    { id: 'scanner', label: 'Scanner' },
+    { id: 'review', label: 'Reviews', badge: reviewCount },
+    { id: 'history', label: 'History' },
+    { id: 'reports', label: 'Reports' },
+    { id: 'surveillance', label: 'Surveillance' },
+  ];
 
   return (
-    <header className="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="bg-amber-500 text-slate-950 p-2 rounded-lg font-bold flex items-center justify-center shadow-lg shadow-amber-500/20">
-            <Scale className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-['Plus_Jakarta_Sans'] font-extrabold text-lg text-white tracking-tight">
-                PRAMAAN
-              </span>
-              <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-500/20 font-mono">
-                SIH26034
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400 hidden sm:block">
-              Department of Consumer Affairs • Legal Metrology Enforcement
-            </p>
-          </div>
+    <nav className="absolute top-0 left-0 right-0 z-20 px-4 sm:px-6 py-4 sm:py-5 pointer-events-auto">
+      <div className="max-w-[88rem] mx-auto flex items-center justify-between">
+        
+        {/* Left: Custom Logo + Wordmark */}
+        <button
+          onClick={() => {
+            setActiveTab('dashboard');
+            setMobileMenuOpen(false);
+          }}
+          className="flex items-center gap-2.5 sm:gap-3 group focus:outline-none text-left"
+        >
+          <LogoIcon className="w-6 h-6 sm:w-7 sm:h-7 text-black transition-transform duration-200 group-hover:scale-105" />
+          <span className="text-xl sm:text-2xl font-medium tracking-tight text-black" style={{ letterSpacing: '-0.03em' }}>
+            Pramaan
+          </span>
+        </button>
+
+        {/* Center: Nav Links (Desktop) */}
+        <div className="hidden md:flex items-center gap-8">
+          {navLinks.map((link) => {
+            const isActive = activeTab === link.id;
+            return (
+              <button
+                key={link.id}
+                onClick={() => setActiveTab(link.id)}
+                className={`relative text-base font-medium transition-colors duration-200 ${
+                  isActive ? 'text-black' : 'text-gray-700 hover:text-black'
+                }`}
+              >
+                <span>{link.label}</span>
+                {link.badge != null && link.badge > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.2 bg-black text-white text-[11px] font-mono rounded-full">
+                    {link.badge}
+                  </span>
+                )}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeNavIndicator"
+                    className="absolute -bottom-1.5 left-0 right-0 h-0.5 bg-black rounded-full"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1.5">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              activeTab === 'dashboard'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+        {/* Right: Actions + Mobile Hamburger */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Backend Status Indicator */}
+          <div
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono border ${
+              isBackendHealthy
+                ? 'bg-white/80 text-emerald-800 border-emerald-200/80 backdrop-blur-sm'
+                : 'bg-rose-50 text-rose-800 border-rose-200 backdrop-blur-sm'
             }`}
+            title={isBackendHealthy ? 'FastAPI Backend Online' : 'Backend Unreachable'}
           >
-            <BarChart3 className="w-4 h-4" />
-            <span>Overview</span>
-          </button>
+            <span className={`w-1.5 h-1.5 rounded-full ${isBackendHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span>{isBackendHealthy ? '8000 LIVE' : 'OFFLINE'}</span>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('repository')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              activeTab === 'repository'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Search className="w-4 h-4" />
-            <span>Repository & Search</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('adjudication')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              activeTab === 'adjudication'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Adjudication</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('review')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition relative ${
-              activeTab === 'review'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span>Review Queue</span>
-            {reviewCount > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1">
-                {reviewCount}
-              </span>
-            )}
-          </button>
-        </nav>
-
-        {/* Actions & Officer Profile */}
-        <div className="flex items-center gap-3">
           {/* Primary Action Button */}
           <button
-            onClick={onOpenNewInspection}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-md shadow-blue-600/20 transition active:scale-95"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onOpenNewInspection();
+            }}
+            className="bg-black text-white text-xs sm:text-base font-medium px-4 sm:px-7 py-2 sm:py-2.5 rounded-full hover:bg-gray-800 transition-colors duration-200 flex items-center gap-1.5 sm:gap-2 shadow-sm"
           >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">New Inspection</span>
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            <span>Inspect</span>
           </button>
 
-          {/* Officer Session Profile Card */}
+          {/* Officer Session Profile Menu */}
           <div className="relative">
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-slate-800/80 transition text-left"
+              className="p-2 sm:p-2.5 rounded-full bg-white/80 hover:bg-white text-black border border-black/10 backdrop-blur-sm transition shadow-sm"
+              title="Officer Profile"
             >
-              <div className="text-right hidden md:block">
-                <div className="text-xs font-semibold text-slate-200">
-                  {officerSession?.name || 'Inspector R. Sharma'}
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 justify-end">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  {officerSession?.badge_number || 'DL-LM-4821'} • Active
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-slate-950 font-bold text-xs shadow">
-                RS
-              </div>
+              <ShieldCheck className="w-4 h-4 text-black" />
             </button>
 
-            {/* Officer Dropdown Details */}
-            {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 text-xs space-y-3 animate-in fade-in zoom-in-95">
-                <div className="border-b border-slate-800 pb-2">
-                  <div className="font-bold text-slate-200">{officerSession?.name || 'Inspector R. Sharma'}</div>
-                  <div className="text-slate-400 text-[11px]">{officerSession?.email || 'officer@consumer.gov.in'}</div>
-                  <div className="text-[10px] font-mono text-amber-400 mt-1">
-                    Badge: {officerSession?.badge_number || 'DL-LM-4821'} (Enforcement Officer)
+            <AnimatePresence>
+              {showProfileMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-gray-200 shadow-xl p-4 z-50 text-xs text-black"
+                >
+                  <div className="pb-3 border-b border-gray-100">
+                    <div className="font-semibold text-sm text-black">
+                      {officerSession?.name || 'Authorized Officer'}
+                    </div>
+                    <div className="text-gray-500 font-mono text-[11px]">
+                      Badge: {officerSession?.badge_number || 'IND-LM-0428'}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      {officerSession?.role || 'Senior Metrology Inspector'}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                    <span>JWT Session Status:</span>
-                    <span className="text-emerald-400 font-mono">Authenticated</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                    <span>Role Permissions:</span>
-                    <span className="text-slate-300 capitalize">{officerSession?.role || 'officer'}</span>
-                  </div>
-                </div>
+                  <div className="pt-2 space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        onReLogin();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-100 text-gray-700 flex items-center gap-2 transition"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      <span>Switch Credentials</span>
+                    </button>
 
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      onReLogin();
-                    }}
-                    className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-[11px] transition"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    Switch User
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      onLogout();
-                    }}
-                    className="flex items-center gap-1.5 text-slate-400 hover:text-rose-400 text-[11px] transition"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-            )}
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        onLogout();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Terminate Session</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+
+          {/* Mobile Menu Hamburger Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-full bg-white/80 hover:bg-white text-black border border-black/10 backdrop-blur-sm transition shadow-sm"
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+
         </div>
+
       </div>
-    </header>
+
+      {/* Mobile Drawer Navigation Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="md:hidden mt-3 p-4 bg-white/95 backdrop-blur-lg border border-gray-200 rounded-3xl shadow-xl space-y-2 z-50"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {navLinks.map((link) => {
+                const isActive = activeTab === link.id;
+                return (
+                  <button
+                    key={link.id}
+                    onClick={() => {
+                      setActiveTab(link.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`p-3 rounded-2xl text-left text-sm font-medium transition flex items-center justify-between ${
+                      isActive
+                        ? 'bg-black text-white font-semibold shadow-sm'
+                        : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{link.label}</span>
+                    {link.badge != null && link.badge > 0 && (
+                      <span className={`px-2 py-0.5 text-[10px] font-mono rounded-full ${
+                        isActive ? 'bg-white text-black' : 'bg-black text-white'
+                      }`}>
+                        {link.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 px-2">
+              <span className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${isBackendHealthy ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                <span>Backend: {isBackendHealthy ? 'Online (8000)' : 'Offline'}</span>
+              </span>
+              <span className="font-mono">{officerSession?.badge_number || 'IND-LM-0428'}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
   );
 };

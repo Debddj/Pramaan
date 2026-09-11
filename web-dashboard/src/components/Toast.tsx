@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, AlertOctagon, AlertTriangle, Info, X } from 'lucide-react';
 
 export interface ToastItem {
@@ -8,56 +9,72 @@ export interface ToastItem {
   message: string;
 }
 
-interface ToastProps {
+interface ToastContainerProps {
   toasts: ToastItem[];
   onDismiss: (id: string) => void;
 }
 
-export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
-  if (toasts.length === 0) return null;
-
+export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none">
-      {toasts.map((toast) => {
-        const isSuccess = toast.type === 'success';
-        const isError = toast.type === 'error';
-        const isWarning = toast.type === 'warning';
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-4 sm:px-0">
+      <AnimatePresence>
+        {toasts.map((toast) => {
+          const config = {
+            success: {
+              icon: <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />,
+              border: 'border-emerald-200',
+              bg: 'bg-white',
+              titleColor: 'text-emerald-950',
+            },
+            error: {
+              icon: <AlertOctagon className="w-5 h-5 text-rose-600 flex-shrink-0" />,
+              border: 'border-rose-200',
+              bg: 'bg-white',
+              titleColor: 'text-rose-950',
+            },
+            warning: {
+              icon: <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />,
+              border: 'border-amber-200',
+              bg: 'bg-white',
+              titleColor: 'text-amber-950',
+            },
+            info: {
+              icon: <Info className="w-5 h-5 text-indigo-600 flex-shrink-0" />,
+              border: 'border-indigo-200',
+              bg: 'bg-white',
+              titleColor: 'text-indigo-950',
+            },
+          }[toast.type];
 
-        return (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto rounded-xl border p-4 shadow-2xl backdrop-blur flex items-start gap-3 transition-all duration-300 animate-in slide-in-from-bottom-3 ${
-              isSuccess
-                ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-100'
-                : isError
-                ? 'bg-rose-950/90 border-rose-500/30 text-rose-100'
-                : isWarning
-                ? 'bg-amber-950/90 border-amber-500/30 text-amber-100'
-                : 'bg-slate-900/90 border-slate-700 text-slate-100'
-            }`}
-          >
-            <div className="mt-0.5 flex-shrink-0">
-              {isSuccess && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-              {isError && <AlertOctagon className="w-5 h-5 text-rose-400" />}
-              {isWarning && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-              {!isSuccess && !isError && !isWarning && <Info className="w-5 h-5 text-blue-400" />}
-            </div>
-
-            <div className="flex-1 text-xs">
-              {toast.title && <div className="font-bold text-sm mb-0.5">{toast.title}</div>}
-              <div className="leading-relaxed opacity-90">{toast.message}</div>
-            </div>
-
-            <button
-              onClick={() => onDismiss(toast.id)}
-              className="text-slate-400 hover:text-white p-1 rounded transition flex-shrink-0"
-              aria-label="Dismiss notification"
+          return (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+              className={`pointer-events-auto rounded-xl p-4 border ${config.border} ${config.bg} shadow-dropdown flex items-start gap-3 relative overflow-hidden`}
             >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        );
-      })}
+              {config.icon}
+              <div className="flex-1 min-w-0 pr-4">
+                {toast.title && (
+                  <h4 className={`text-xs font-bold ${config.titleColor} mb-0.5`}>
+                    {toast.title}
+                  </h4>
+                )}
+                <p className="text-xs text-slate-600 leading-relaxed break-words">
+                  {toast.message}
+                </p>
+              </div>
+              <button
+                onClick={() => onDismiss(toast.id)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 };

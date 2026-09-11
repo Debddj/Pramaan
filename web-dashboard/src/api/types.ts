@@ -39,6 +39,12 @@ export interface ScanResult {
   status: 'compliant' | 'violation' | 'under_review' | 'exempt';
   overall_confidence: number;
   needs_review: boolean;
+  is_calibrated?: boolean;
+  calibration_status?: string;
+  is_checksum_valid?: boolean;
+  calibration_note?: string;
+  authoritative_cv?: boolean;
+  is_duplicate?: boolean;
   scale_factor_mm_per_px?: number;
   pdp_area_sq_cm?: number;
   measured_numeral_height_mm?: number;
@@ -46,7 +52,7 @@ export interface ScanResult {
   violations: Violation[];
   sha256_hash?: string;
   image_url?: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export interface ViolationRuleMetric {
@@ -63,15 +69,15 @@ export interface TopOffendingBrand {
 }
 
 export interface RecentScanSummary {
-  id: number;
+  id?: number;
   scan_uuid: string;
   product: string;
   manufacturer?: string;
-  barcode: string;
+  barcode?: string;
   status: string;
-  time: string;
+  time?: string;
   confidence: number;
-  officer: string;
+  officer?: string;
 }
 
 export interface DashboardMetrics {
@@ -84,6 +90,12 @@ export interface DashboardMetrics {
   violations_by_rule: ViolationRuleMetric[];
   recent_scans: RecentScanSummary[];
   top_non_compliant_brands: TopOffendingBrand[];
+  total_scans?: number;
+  violations_detected?: number;
+  compliant_count?: number;
+  under_review_count?: number;
+  compliance_rate?: string;
+  violation_breakdown?: Array<{ rule: string; count: number }>;
 }
 
 export interface ReviewQueueItem {
@@ -100,6 +112,7 @@ export interface ReviewActionRequest {
   corrected_height_mm?: number;
 }
 
+// Search & Retrieval Repository Types
 export interface RepositoryScanItem {
   id: number;
   scan_uuid: string;
@@ -121,4 +134,55 @@ export interface ScanSearchResponse {
   page: number;
   limit: number;
   scans: RepositoryScanItem[];
+}
+
+// E-Commerce Surveillance Types
+export interface ListingItem {
+  id: string;
+  title: string;
+  marketplace: string;
+  url: string;
+  brand?: string;
+  category?: string;
+  mrp?: number;
+  net_quantity?: string;
+  image_url?: string;
+  declared_origin?: string;
+}
+
+export interface SurveillanceScanResponse {
+  listing_id?: string;
+  listing_url: string;
+  marketplace: string;
+  product_title: string;
+  status: 'compliant' | 'violation';
+  violations: Violation[];
+  extracted_data?: Record<string, any>;
+  scanned_at?: string;
+}
+
+export interface SurveillanceBulkScanResponse {
+  scanned_count: number;
+  compliant_count: number;
+  violation_count: number;
+  results: SurveillanceScanResponse[];
+}
+
+export interface SurveillanceResultRecord {
+  id: number;
+  listing_url: string;
+  marketplace: string;
+  product_title: string;
+  status: string;
+  violations_count: number;
+  scraped_at: string;
+}
+
+export interface DeepHealthStatus {
+  status: string;
+  database: string;
+  storage: string;
+  gemini_vlm: string;
+  paddle_ocr: string;
+  disk_free_gb: number;
 }

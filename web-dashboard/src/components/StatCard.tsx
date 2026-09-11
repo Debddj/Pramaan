@@ -1,12 +1,14 @@
-﻿import React from 'react';
+import React from 'react';
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  subtitle: string;
-  icon: React.ReactNode;
-  trend?: string;
-  color?: 'blue' | 'amber' | 'emerald' | 'rose';
+  subtitle?: string;
+  icon?: React.ReactNode;
+  trend?: {
+    value: string;
+    isPositive: boolean;
+  };
   onClick?: () => void;
 }
 
@@ -16,38 +18,46 @@ export const StatCard: React.FC<StatCardProps> = ({
   subtitle,
   icon,
   trend,
-  color = 'blue',
   onClick,
 }) => {
-  const colorMap = {
-    blue: 'border-blue-500/20 bg-blue-950/10 text-blue-400',
-    amber: 'border-amber-500/20 bg-amber-950/10 text-amber-400',
-    emerald: 'border-emerald-500/20 bg-emerald-950/10 text-emerald-400',
-    rose: 'border-rose-500/20 bg-rose-950/10 text-rose-400',
-  };
-
   return (
     <div
       onClick={onClick}
-      className={`bg-slate-900 border border-slate-800 rounded-xl p-5 transition text-left select-none ${
-        onClick
-          ? 'cursor-pointer hover:border-slate-700 hover:bg-slate-800/60 active:scale-[0.99]'
-          : ''
+      className={`bg-white border border-slate-200/90 rounded-2xl p-5 transition-all text-left select-none shadow-sm ${
+        onClick ? 'cursor-pointer hover:border-slate-300 hover:shadow-card-hover' : ''
       }`}
     >
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
           {title}
         </span>
-        <div className={`p-2 rounded-lg border ${colorMap[color]}`}>{icon}</div>
+        {icon && (
+          <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+            {icon}
+          </div>
+        )}
       </div>
-      <div className="text-2xl font-bold font-['Plus_Jakarta_Sans'] text-white">
-        {value}
+
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+          {value}
+        </span>
+        {trend && (
+          <span
+            className={`text-xs font-semibold ${
+              trend.isPositive ? 'text-emerald-700' : 'text-rose-700'
+            }`}
+          >
+            {trend.value}
+          </span>
+        )}
       </div>
-      <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
-        <span>{subtitle}</span>
-        {trend && <span className="font-semibold text-emerald-400">{trend}</span>}
-      </div>
+
+      {subtitle && (
+        <p className="text-[11px] text-slate-500 mt-1 font-medium">
+          {subtitle}
+        </p>
+      )}
     </div>
   );
 };

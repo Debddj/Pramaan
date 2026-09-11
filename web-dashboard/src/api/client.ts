@@ -1,12 +1,22 @@
 import axios from 'axios';
 import { getAuthToken } from './auth';
-import { ScanResult, DashboardMetrics, ReviewQueueItem, ScanSearchResponse } from './types';
+import { 
+  ScanResult, 
+  DashboardMetrics, 
+  ReviewQueueItem, 
+  ListingItem, 
+  SurveillanceScanResponse, 
+  SurveillanceBulkScanResponse, 
+  SurveillanceResultRecord, 
+  DeepHealthStatus,
+  ScanSearchResponse
+} from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 25000,
 });
 
 // Automatic JWT bearer token injection
@@ -31,7 +41,7 @@ export const formatApiError = (err: unknown): string => {
       return 'Access denied: Officer privileges required for this enforcement action.';
     }
     if (status === 404) {
-      return detail || 'The requested scan record or report was not found on the server.';
+      return detail || 'The requested inspection record or report was not found on the server.';
     }
     if (status === 422) {
       return 'Validation failure: Inspection metadata does not conform to statutory specifications.';
@@ -40,12 +50,12 @@ export const formatApiError = (err: unknown): string => {
       return 'Rate limit exceeded. Please wait a moment before initiating another scan.';
     }
     if (status && status >= 500) {
-      return detail || 'Internal rules engine error. Check FastAPI server logs for diagnostic traceback.';
+      return typeof detail === 'string' ? detail : 'Internal rules engine error. Check FastAPI server logs for diagnostic traceback.';
     }
     if (err.code === 'ERR_NETWORK' || !err.response) {
       return 'Pramaan inspection backend unreachable. Verify FastAPI is active at ' + API_BASE_URL;
     }
-    return detail || err.message || 'An unexpected API error occurred.';
+    return typeof detail === 'string' ? detail : err.message || 'An unexpected API error occurred.';
   }
   if (err instanceof Error) {
     return err.message;
@@ -53,13 +63,13 @@ export const formatApiError = (err: unknown): string => {
   return 'An unknown communication error occurred.';
 };
 
-// Real API call - no silent fallback hiding backend failures
+// 1. Dashboard Metrics
 export const getDashboardMetrics = async (): Promise<DashboardMetrics> => {
   const res = await apiClient.get<DashboardMetrics>('/dashboard/metrics');
   return res.data;
 };
 
-// Explicit offline demo data snapshot - used ONLY when user opts into simulation mode
+// Offline demo dataset fallback (explicit presentation mode only)
 export const getOfflineMockMetrics = (): DashboardMetrics => {
   return {
     kpis: {
@@ -78,36 +88,36 @@ export const getOfflineMockMetrics = (): DashboardMetrics => {
     recent_scans: [
       {
         id: 1,
-        scan_uuid: "demo-scan-001",
-        product: "Crispy Marie Biscuits",
+        scan_uuid: "PRM-DEMO-001",
+        product: "Good Day Butter Cookies 100g",
         manufacturer: "Britannia Industries Ltd",
         barcode: "8901030000001",
         status: "compliant",
         time: "10:14:22",
         confidence: 0.94,
-        officer: "DL-LM-4821"
+        officer: "Inspector R. Sharma"
       },
       {
         id: 2,
-        scan_uuid: "demo-scan-002",
+        scan_uuid: "PRM-DEMO-002",
         product: "QuickSnack Cookies 75g",
-        manufacturer: "QuickSnack Foods",
+        manufacturer: "QuickSnack Packaged Foods",
         barcode: "8901030000002",
         status: "violation",
         time: "10:32:05",
         confidence: 0.88,
-        officer: "DL-LM-4821"
+        officer: "Inspector R. Sharma"
       },
       {
         id: 3,
-        scan_uuid: "demo-scan-003",
+        scan_uuid: "PRM-DEMO-003",
         product: "PureGlow Herbal Soap 85g",
         manufacturer: "PureGlow Personal Care",
         barcode: "8901030000003",
         status: "under_review",
         time: "11:05:40",
-        confidence: 0.76,
-        officer: "DL-LM-4821"
+        confidence: 0.74,
+        officer: "Inspector R. Sharma"
       }
     ],
     top_non_compliant_brands: [
@@ -118,26 +128,25 @@ export const getOfflineMockMetrics = (): DashboardMetrics => {
   };
 };
 
+// 2. Scan & Inspection Endpoints
 export const triggerSimulatedScan = async (params: {
   barcode?: string;
   category?: string;
   detected_text_height_px?: number;
   pdp_area_sq_cm?: number;
-  raw_ocr_text?: string;
 }): Promise<ScanResult> => {
   const res = await apiClient.post<ScanResult>('/scan', {
     barcode: params.barcode || "8901030000001",
     category: params.category || "biscuits",
     detected_barcode_width_px: 745.8,
-    detected_text_height_px: params.detected_text_height_px || 36.0,
-    pdp_area_sq_cm: params.pdp_area_sq_cm || 150.0,
-    raw_ocr_text: params.raw_ocr_text,
+    detected_text_height_px: params.detected_text_height_px || 50.0,
+    pdp_area_sq_cm: params.pdp_area_sq_cm || 150.0
   });
   return res.data;
 };
 
 export const uploadInspectionScan = async (
-  file: File,
+  file: File | Blob,
   params?: {
     barcode?: string;
     category?: string;
@@ -145,7 +154,7 @@ export const uploadInspectionScan = async (
   }
 ): Promise<ScanResult> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', file, 'package_scan.jpg');
   if (params?.barcode) formData.append('barcode', params.barcode);
   if (params?.category) formData.append('category', params.category);
   if (params?.pdp_area_sq_cm) formData.append('pdp_area_sq_cm', params.pdp_area_sq_cm.toString());
@@ -158,6 +167,7 @@ export const uploadInspectionScan = async (
   return res.data;
 };
 
+// 3. Review Queue Endpoints
 export const getReviewQueue = async (): Promise<ReviewQueueItem[]> => {
   const res = await apiClient.get<ReviewQueueItem[]>('/review');
   return res.data;
@@ -170,11 +180,12 @@ export const adjudicateScan = async (
 ): Promise<{ message: string; scan_uuid: string; status: string }> => {
   const res = await apiClient.post(`/review/${scan_uuid}`, {
     adjudication,
-    notes: notes || `Adjudicated as ${adjudication} by supervising officer`,
+    notes: notes || `Adjudicated as ${adjudication} by supervising enforcement officer`,
   });
   return res.data;
 };
 
+// 4. Reports / Legal Notices PDF, CSV, JSON
 export const downloadNoticePdf = async (scan_uuid: string): Promise<void> => {
   const res = await apiClient.get(`/reports/${scan_uuid}/pdf`, {
     responseType: 'blob',
@@ -187,23 +198,31 @@ export const downloadNoticePdf = async (scan_uuid: string): Promise<void> => {
   
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Pramaan_Statutory_Notice_${scan_uuid}.${isPdf ? 'pdf' : 'html'}`;
+  link.download = `Pramaan_Legal_Notice_${scan_uuid}.${isPdf ? 'pdf' : 'html'}`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 };
 
+export const getNoticePdfBlobUrl = async (scan_uuid: string): Promise<string> => {
+  const res = await apiClient.get(`/reports/${scan_uuid}/pdf`, {
+    responseType: 'blob',
+  });
+  const contentType = String(res.headers['content-type'] || 'application/pdf');
+  const blob = new Blob([res.data], { type: contentType });
+  return window.URL.createObjectURL(blob);
+};
+
 export const downloadReportCsv = async (scan_uuid: string): Promise<void> => {
   const res = await apiClient.get(`/reports/${scan_uuid}/csv`, {
     responseType: 'blob',
   });
-
   const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Pramaan_Statutory_Report_${scan_uuid}.csv`;
+  link.download = `Pramaan_Report_${scan_uuid}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -214,36 +233,64 @@ export const downloadReportJson = async (scan_uuid: string): Promise<void> => {
   const res = await apiClient.get(`/reports/${scan_uuid}/json`, {
     responseType: 'blob',
   });
-
-  const blob = new Blob([res.data], { type: 'application/json;charset=utf-8;' });
+  const blob = new Blob([res.data], { type: 'application/json' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Pramaan_Statutory_Report_${scan_uuid}.json`;
+  link.download = `Pramaan_Report_${scan_uuid}.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 };
 
+// 5. Search & Retrieval Facility
 export const searchScans = async (params: {
   q?: string;
   status?: string;
   page?: number;
   limit?: number;
 }): Promise<ScanSearchResponse> => {
-  const res = await apiClient.get<ScanSearchResponse>('/scans', {
-    params: {
-      q: params.q || undefined,
-      status: params.status && params.status !== 'all' ? params.status : undefined,
-      page: params.page || 1,
-      limit: params.limit || 20,
-    },
-  });
+  const res = await apiClient.get<ScanSearchResponse>('/scans', { params });
   return res.data;
 };
 
 export const getScanByUuid = async (scan_uuid: string): Promise<ScanResult> => {
   const res = await apiClient.get<ScanResult>(`/scans/${scan_uuid}`);
+  return res.data;
+};
+
+// 6. E-Commerce Surveillance
+export const getSurveillanceListings = async (): Promise<ListingItem[]> => {
+  const res = await apiClient.get<ListingItem[]>('/surveillance/listings');
+  return res.data;
+};
+
+export const scanSurveillanceListing = async (listing_id?: string, listing_url?: string): Promise<SurveillanceScanResponse> => {
+  const res = await apiClient.post<SurveillanceScanResponse>('/surveillance/scan-listing', {
+    listing_id,
+    listing_url
+  });
+  return res.data;
+};
+
+export const bulkScanSurveillance = async (): Promise<SurveillanceBulkScanResponse> => {
+  const res = await apiClient.post<SurveillanceBulkScanResponse>('/surveillance/bulk-scan');
+  return res.data;
+};
+
+export const getSurveillanceResults = async (): Promise<SurveillanceResultRecord[]> => {
+  const res = await apiClient.get<SurveillanceResultRecord[]>('/surveillance/results');
+  return res.data;
+};
+
+// 7. Health Checks
+export const getHealthCheck = async () => {
+  const res = await apiClient.get('/health');
+  return res.data;
+};
+
+export const getDeepHealth = async (): Promise<DeepHealthStatus> => {
+  const res = await apiClient.get<DeepHealthStatus>('/health/deep');
   return res.data;
 };
