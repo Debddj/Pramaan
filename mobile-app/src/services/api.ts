@@ -116,6 +116,8 @@ export const api = {
   },
 
   getNoticeUrl(scanUuid: string) {
-    return `${currentBaseUrl}/reports/${scanUuid}/pdf`;
+    const token = authToken || getAuthToken();
+    const query = token ? `?token=${encodeURIComponent(token)}` : "";
+    return `${currentBaseUrl}/reports/${scanUuid}/pdf${query}`;
   },
 };
