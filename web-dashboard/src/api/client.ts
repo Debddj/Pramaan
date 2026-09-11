@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 import { getAuthToken } from './auth';
 import { ScanResult, DashboardMetrics, ReviewQueueItem } from './types';
 
@@ -123,13 +123,15 @@ export const triggerSimulatedScan = async (params: {
   category?: string;
   detected_text_height_px?: number;
   pdp_area_sq_cm?: number;
+  raw_ocr_text?: string;
 }): Promise<ScanResult> => {
   const res = await apiClient.post<ScanResult>('/scan', {
     barcode: params.barcode || "8901030000001",
     category: params.category || "biscuits",
     detected_barcode_width_px: 745.8,
     detected_text_height_px: params.detected_text_height_px || 36.0,
-    pdp_area_sq_cm: params.pdp_area_sq_cm || 150.0
+    pdp_area_sq_cm: params.pdp_area_sq_cm || 150.0,
+    raw_ocr_text: params.raw_ocr_text,
   });
   return res.data;
 };

@@ -164,11 +164,18 @@ export default function App() {
     showFeedbackToast = true
   ) => {
     setScanLoading(true);
-    let params = {
+    let params: {
+      barcode: string;
+      category: string;
+      detected_text_height_px: number;
+      pdp_area_sq_cm: number;
+      raw_ocr_text?: string;
+    } = {
       barcode: "8901030000001",
       category: "biscuits",
-      detected_text_height_px: 50.0, // 2.5mm -> compliant
-      pdp_area_sq_cm: 150.0
+      detected_text_height_px: 50.0, // 2.5mm >= 2.0mm minimum -> Compliant
+      pdp_area_sq_cm: 150.0,
+      raw_ocr_text: "Britannia Industries Ltd, 5/1A Hungerford Street, Kolkata - 700017\nCommodity: Biscuits\nNet Quantity: 100 g\nMfg Date: 08/2026\nMRP: Rs. 30.00 (Inclusive of all taxes)\nConsumer Care: feedback@britannia.co.in | 1800-425-4449",
     };
 
     if (scenario === 'undersized') {
@@ -176,21 +183,24 @@ export default function App() {
         barcode: "8901030000002",
         category: "biscuits",
         detected_text_height_px: 30.0, // 1.5mm < 2.0mm required -> Rule 7 violation
-        pdp_area_sq_cm: 150.0
+        pdp_area_sq_cm: 150.0,
+        raw_ocr_text: "Britannia Industries Ltd, 5/1A Hungerford Street, Kolkata - 700017\nCommodity: Biscuits\nNet Quantity: 100 g\nMfg Date: 08/2026\nMRP: Rs. 30.00 (Inclusive of all taxes)\nConsumer Care: feedback@britannia.co.in | 1800-425-4449",
       };
     } else if (scenario === 'off_size') {
       params = {
         barcode: "8901030000004",
         category: "biscuits",
         detected_text_height_px: 50.0,
-        pdp_area_sq_cm: 150.0
+        pdp_area_sq_cm: 150.0,
+        raw_ocr_text: "Britannia Industries Ltd, 5/1A Hungerford Street, Kolkata - 700017\nCommodity: Biscuits\nNet Quantity: 65 g\nMfg Date: 08/2026\nMRP: Rs. 20.00 (Inclusive of all taxes)\nConsumer Care: feedback@britannia.co.in | 1800-425-4449",
       };
     } else if (scenario === 'glare') {
       params = {
         barcode: "8901030048123",
         category: "biscuits",
         detected_text_height_px: 36.0,
-        pdp_area_sq_cm: 150.0
+        pdp_area_sq_cm: 150.0,
+        raw_ocr_text: "Britannia Industries Ltd, Kolkata\nCommodity: Biscuits\nNet Quantity: 100 g",
       };
     }
 
