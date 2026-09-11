@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getAuthToken } from './auth';
-import { ScanResult, DashboardMetrics, ReviewQueueItem } from './types';
+import { ScanResult, DashboardMetrics, ReviewQueueItem, ScanSearchResponse } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -192,4 +192,58 @@ export const downloadNoticePdf = async (scan_uuid: string): Promise<void> => {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+};
+
+export const downloadReportCsv = async (scan_uuid: string): Promise<void> => {
+  const res = await apiClient.get(`/reports/${scan_uuid}/csv`, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Pramaan_Statutory_Report_${scan_uuid}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const downloadReportJson = async (scan_uuid: string): Promise<void> => {
+  const res = await apiClient.get(`/reports/${scan_uuid}/json`, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([res.data], { type: 'application/json;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Pramaan_Statutory_Report_${scan_uuid}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const searchScans = async (params: {
+  q?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<ScanSearchResponse> => {
+  const res = await apiClient.get<ScanSearchResponse>('/scans', {
+    params: {
+      q: params.q || undefined,
+      status: params.status && params.status !== 'all' ? params.status : undefined,
+      page: params.page || 1,
+      limit: params.limit || 20,
+    },
+  });
+  return res.data;
+};
+
+export const getScanByUuid = async (scan_uuid: string): Promise<ScanResult> => {
+  const res = await apiClient.get<ScanResult>(`/scans/${scan_uuid}`);
+  return res.data;
 };

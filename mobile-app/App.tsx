@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -6,6 +6,7 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { CaptureScreen } from "./src/screens/CaptureScreen";
 import { ResultScreen } from "./src/screens/ResultScreen";
 import { OfflineQueueScreen } from "./src/screens/OfflineQueueScreen";
+import { HistoryScreen } from "./src/screens/HistoryScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -37,6 +38,11 @@ export default function App() {
           options={{ title: "Inspection Verdict" }}
         />
         <Stack.Screen
+          name="History"
+          component={HistoryScreen}
+          options={{ title: "Inspection Repository & Search" }}
+        />
+        <Stack.Screen
           name="OfflineQueue"
           component={OfflineQueueScreen}
           options={{ title: "Offline Queue" }}
@@ -45,3 +51,4 @@ export default function App() {
     </NavigationContainer>
   );
 }
+

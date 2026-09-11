@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -25,6 +25,16 @@ export const ResultScreen = ({ route, navigation }: any) => {
 
   const handleDownloadNotice = () => {
     const url = api.getNoticeUrl(result.scan_uuid);
+    Linking.openURL(url).catch(() => {});
+  };
+
+  const handleExportCsv = () => {
+    const url = api.getNoticeCsvUrl(result.scan_uuid);
+    Linking.openURL(url).catch(() => {});
+  };
+
+  const handleExportJson = () => {
+    const url = api.getNoticeJsonUrl(result.scan_uuid);
     Linking.openURL(url).catch(() => {});
   };
 
@@ -116,6 +126,16 @@ export const ResultScreen = ({ route, navigation }: any) => {
       <TouchableOpacity style={styles.primaryBtn} onPress={handleDownloadNotice}>
         <Text style={styles.primaryBtnText}>Download Statutory Notice (PDF)</Text>
       </TouchableOpacity>
+
+      {/* Editable Format Report Exports (SIH requirement) */}
+      <View style={styles.exportRow}>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExportCsv}>
+          <Text style={styles.exportBtnText}>Export CSV</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.exportBtn} onPress={handleExportJson}>
+          <Text style={styles.exportBtnText}>Export JSON</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.secondaryBtn}
@@ -240,12 +260,31 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   primaryBtnText: {
     color: "#ffffff",
     fontWeight: "bold",
     fontSize: 15,
+  },
+  exportRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  exportBtn: {
+    flex: 1,
+    backgroundColor: "#1e293b",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#475569",
+  },
+  exportBtnText: {
+    color: "#cbd5e1",
+    fontWeight: "600",
+    fontSize: 13,
   },
   secondaryBtn: {
     backgroundColor: "#334155",

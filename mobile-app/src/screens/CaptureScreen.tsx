@@ -287,6 +287,14 @@ export const CaptureScreen = ({ navigation }: any) => {
             <Text style={styles.torchText}>{torchOn ? "LIGHT ON" : "LIGHT"}</Text>
           </TouchableOpacity>
 
+          {/* Repository & Search Link */}
+          <TouchableOpacity
+            style={styles.historyBtn}
+            onPress={() => navigation.navigate("History")}
+          >
+            <Text style={styles.historyText}>HISTORY</Text>
+          </TouchableOpacity>
+
           {/* Offline Queue Indicator */}
           {pendingCount > 0 && (
             <TouchableOpacity
@@ -349,6 +357,16 @@ export const CaptureScreen = ({ navigation }: any) => {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Search & Repository Button */}
+        <TouchableOpacity
+          style={styles.historyBottomBtn}
+          onPress={() => navigation.navigate("History")}
+        >
+          <Text style={styles.historyBottomBtnText}>
+            🔍 Search Historical Inspections &amp; Reports
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -546,6 +564,29 @@ const styles = StyleSheet.create({
     color: "#f8fafc",
     fontSize: 10,
     fontWeight: "bold",
+  },
+  historyBtn: {
+    backgroundColor: "rgba(15, 23, 42, 0.85)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#3b82f6",
+  },
+  historyText: {
+    color: "#60a5fa",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  historyBottomBtn: {
+    marginTop: 10,
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  historyBottomBtnText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
   },
   offlineBadge: {
     backgroundColor: "#f59e0b",

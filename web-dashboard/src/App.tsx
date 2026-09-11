@@ -13,10 +13,14 @@ import {
   getReviewQueue, 
   adjudicateScan, 
   downloadNoticePdf, 
+  downloadReportCsv,
+  downloadReportJson,
+  searchScans,
+  getScanByUuid,
   formatApiError 
 } from './api/client';
 import { ensureDefaultAuth, clearAuth } from './api/auth';
-import { DashboardMetrics, ScanResult, ReviewQueueItem, OfficerSession } from './api/types';
+import { DashboardMetrics, ScanResult, ReviewQueueItem, OfficerSession, RepositoryScanItem } from './api/types';
 import { 
   ShieldCheck, 
   AlertOctagon, 
@@ -30,11 +34,14 @@ import {
   Info,
   Sparkles,
   Loader2,
-  Check
+  Check,
+  Search,
+  FileSpreadsheet,
+  FileCode
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'adjudication' | 'review'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'adjudication' | 'review' | 'repository'>('dashboard');
   const [officerSession, setOfficerSession] = useState<OfficerSession | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   
@@ -58,6 +65,15 @@ export default function App() {
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [reviewLoading, setReviewLoading] = useState<boolean>(false);
   const [adjudicatingUuid, setAdjudicatingUuid] = useState<string | null>(null);
+
+  // Search & Retrieval Repository state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [repoScans, setRepoScans] = useState<RepositoryScanItem[]>([]);
+  const [repoTotal, setRepoTotal] = useState<number>(0);
+  const [repoPage, setRepoPage] = useState<number>(1);
+  const [repoLoading, setRepoLoading] = useState<boolean>(false);
+  const [exportingUuid, setExportingUuid] = useState<string | null>(null);
 
   // Modals & Toasts
   const [isNewInspectionOpen, setIsNewInspectionOpen] = useState<boolean>(false);
@@ -113,9 +129,66 @@ export default function App() {
     } catch (err: unknown) {
       const errMsg = formatApiError(err);
       setMetricsError(errMsg);
-      // Do NOT silently substitute fake metrics!
     } finally {
       setMetricsLoading(false);
+    }
+  };
+
+  // Fetch Repository Scans (Search & Retrieval)
+  const fetchRepositoryScans = useCallback(async (query = searchQuery, status = statusFilter, page = repoPage) => {
+    setRepoLoading(true);
+    try {
+      const res = await searchScans({ q: query, status, page, limit: 15 });
+      setRepoScans(res.scans || []);
+      setRepoTotal(res.total || 0);
+    } catch (err) {
+      console.warn('Could not fetch repository scans:', err);
+    } finally {
+      setRepoLoading(false);
+    }
+  }, [searchQuery, statusFilter, repoPage]);
+
+  useEffect(() => {
+    if (activeTab === 'repository') {
+      fetchRepositoryScans();
+    }
+  }, [activeTab, fetchRepositoryScans]);
+
+  const handleSelectScanForAdjudication = async (scanUuid: string) => {
+    setScanLoading(true);
+    try {
+      const scanResult = await getScanByUuid(scanUuid);
+      setCurrentScan(scanResult);
+      setActiveTab('adjudication');
+      addToast('info', `Inspection ${scanUuid} loaded into Adjudication Workspace.`, 'Scan Loaded');
+    } catch (err) {
+      addToast('error', formatApiError(err), 'Failed to load inspection');
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const handleExportCsv = async (scanUuid: string) => {
+    setExportingUuid(`csv-${scanUuid}`);
+    try {
+      await downloadReportCsv(scanUuid);
+      addToast('success', `Exported statutory inspection data as CSV.`, 'CSV Export Ready');
+    } catch (err) {
+      addToast('error', formatApiError(err), 'CSV Export Failed');
+    } finally {
+      setExportingUuid(null);
+    }
+  };
+
+  const handleExportJson = async (scanUuid: string) => {
+    setExportingUuid(`json-${scanUuid}`);
+    try {
+      await downloadReportJson(scanUuid);
+      addToast('success', `Exported statutory inspection data as JSON.`, 'JSON Export Ready');
+    } catch (err) {
+      addToast('error', formatApiError(err), 'JSON Export Failed');
+    } finally {
+      setExportingUuid(null);
     }
   };
 
@@ -645,7 +718,16 @@ export default function App() {
                     </h2>
                     <span className="text-xs text-slate-400">Live inspection telemetry stream across enforcement districts</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400">Showing {metrics.recent_scans.length} recent</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-slate-400">Showing {metrics.recent_scans.length} recent</span>
+                    <button
+                      onClick={() => setActiveTab('repository')}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 bg-blue-500/10 px-2.5 py-1 rounded border border-blue-500/20 transition"
+                    >
+                      <Search className="w-3 h-3" />
+                      <span>Search All Scans</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -690,15 +772,21 @@ export default function App() {
                             </span>
                           </td>
                           <td className="py-2.5 text-right">
-                            <button
-                              onClick={() => {
-                                handleSimulate(scan.status === 'compliant' ? 'normal' : 'undersized', false);
-                                setActiveTab('adjudication');
-                              }}
-                              className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
-                            >
-                              View Evidence
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleSelectScanForAdjudication(scan.scan_uuid)}
+                                className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
+                              >
+                                View Evidence
+                              </button>
+                              <button
+                                onClick={() => handleExportCsv(scan.scan_uuid)}
+                                title="Export CSV"
+                                className="text-slate-400 hover:text-emerald-400 p-1"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1158,12 +1246,34 @@ export default function App() {
                         ) : (
                           <>
                             <FileDown className="w-4 h-4" />
-                            <span>Generate Admissible Legal Notice</span>
+                            <span>Generate Admissible Legal Notice (PDF)</span>
                           </>
                         )}
                       </button>
+
+                      {/* Editable Format Report Exports (SIH Functional Requirement) */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          onClick={() => handleExportCsv(currentScan.scan_uuid)}
+                          disabled={exportingUuid === `csv-${currentScan.scan_uuid}`}
+                          className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{exportingUuid === `csv-${currentScan.scan_uuid}` ? 'Exporting...' : 'Export CSV'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleExportJson(currentScan.scan_uuid)}
+                          disabled={exportingUuid === `json-${currentScan.scan_uuid}`}
+                          className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                        >
+                          <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                          <span>{exportingUuid === `json-${currentScan.scan_uuid}` ? 'Exporting...' : 'Export JSON'}</span>
+                        </button>
+                      </div>
+
                       <p className="text-[10px] text-slate-500 text-center">
-                        Securely generated with JWT auth • Section 65B Indian Evidence Act compliant
+                        Court-admissible PDF • Editable CSV &amp; JSON data • Section 65B Indian Evidence Act compliant
                       </p>
                     </div>
                   </div>
@@ -1295,6 +1405,233 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 4: REPOSITORY & SEARCH FACILITY (SIH Key Functional Requirement) */}
+        {/* ========================================================================= */}
+        {activeTab === 'repository' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold text-white">Statutory Packaging Inspection Repository</h1>
+                  <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                    {repoTotal} Total Inspected Products
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Search &amp; retrieval facility for historical packaging inspections, optical calibrations, and statutory notices
+                </p>
+              </div>
+
+              <button
+                onClick={() => fetchRepositoryScans()}
+                disabled={repoLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${repoLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh Repository</span>
+              </button>
+            </div>
+
+            {/* Search & Filter Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2 relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by Barcode (EAN-13), Commodity Name, Manufacturer / Brand, or UUID..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setRepoPage(1);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      fetchRepositoryScans(searchQuery, statusFilter, 1);
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-24 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={() => fetchRepositoryScans(searchQuery, statusFilter, 1)}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold transition"
+                >
+                  Search
+                </button>
+              </div>
+
+              {/* Status Filter Chips */}
+              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-lg overflow-x-auto text-xs">
+                {(['all', 'compliant', 'violation', 'under_review'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      setStatusFilter(status);
+                      setRepoPage(1);
+                      fetchRepositoryScans(searchQuery, status, 1);
+                    }}
+                    className={`px-2.5 py-1 rounded font-medium capitalize text-[11px] transition whitespace-nowrap ${
+                      statusFilter === status
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {status.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results Table */}
+            {repoLoading ? (
+              <div className="py-16 text-center space-y-3">
+                <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto" />
+                <p className="text-xs text-slate-400">Querying statutory metrology inspection records...</p>
+              </div>
+            ) : repoScans.length === 0 ? (
+              <div className="py-16 text-center space-y-3 bg-slate-950/50 border border-slate-800/80 rounded-xl">
+                <Search className="w-10 h-10 text-slate-500 mx-auto" />
+                <h3 className="text-sm font-bold text-white">No Matching Products Found</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  No packaged commodity inspections match your current search query or filter criteria.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-950 border-b border-slate-800 text-slate-400">
+                    <tr>
+                      <th className="py-3 px-3 font-semibold">Scan UUID</th>
+                      <th className="py-3 px-3 font-semibold">Product / Brand</th>
+                      <th className="py-3 px-3 font-semibold">Barcode</th>
+                      <th className="py-3 px-3 font-semibold">Optical Caliper</th>
+                      <th className="py-3 px-3 font-semibold">Violations</th>
+                      <th className="py-3 px-3 font-semibold">Status</th>
+                      <th className="py-3 px-3 font-semibold text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {repoScans.map((scan) => (
+                      <tr key={scan.scan_uuid} className="hover:bg-slate-800/30 transition">
+                        <td className="py-3 px-3 font-mono text-blue-400 font-semibold">
+                          {scan.scan_uuid}
+                          <span className="text-[10px] text-slate-500 block font-sans">{scan.time || scan.created_at.slice(11, 19)}</span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-200">
+                          <div className="font-semibold text-slate-100">{scan.product}</div>
+                          {scan.manufacturer && (
+                            <span className="text-[11px] text-slate-400 block">{scan.manufacturer}</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-300">{scan.barcode}</td>
+                        <td className="py-3 px-3 font-mono text-slate-400">
+                          {scan.measured_numeral_height_mm ? (
+                            <span>{scan.measured_numeral_height_mm.toFixed(2)} mm</span>
+                          ) : (
+                            <span className="text-slate-500 text-[10px]">Uncalibrated</span>
+                          )}
+                          {scan.pdp_area_sq_cm && (
+                            <span className="text-[10px] text-slate-500 block">PDP: {scan.pdp_area_sq_cm.toFixed(0)} cm²</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          {scan.violations_count > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                              {scan.violations_count} Non-Compliant
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              0 Infractions
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                              scan.status === 'compliant'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : scan.status === 'violation'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            }`}
+                          >
+                            {scan.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleSelectScanForAdjudication(scan.scan_uuid)}
+                              className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded text-[11px] font-semibold border border-blue-500/30 transition"
+                            >
+                              Adjudicate
+                            </button>
+                            <button
+                              onClick={() => downloadNoticePdf(scan.scan_uuid)}
+                              title="Download PDF Statutory Notice"
+                              className="p-1 text-slate-400 hover:text-white transition"
+                            >
+                              <FileDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleExportCsv(scan.scan_uuid)}
+                              title="Export Editable CSV"
+                              className="p-1 text-slate-400 hover:text-emerald-400 transition"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleExportJson(scan.scan_uuid)}
+                              title="Export Editable JSON"
+                              className="p-1 text-slate-400 hover:text-blue-400 transition"
+                            >
+                              <FileCode className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {repoTotal > 15 && (
+              <div className="flex items-center justify-between pt-2 text-xs text-slate-400 border-t border-slate-800">
+                <div>
+                  Showing {Math.min(repoTotal, (repoPage - 1) * 15 + 1)}–{Math.min(repoTotal, repoPage * 15)} of {repoTotal} scanned commodities
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={repoPage <= 1 || repoLoading}
+                    onClick={() => {
+                      const prev = Math.max(1, repoPage - 1);
+                      setRepoPage(prev);
+                      fetchRepositoryScans(searchQuery, statusFilter, prev);
+                    }}
+                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded border border-slate-700 transition"
+                  >
+                    Previous
+                  </button>
+                  <span className="font-mono text-slate-300">Page {repoPage}</span>
+                  <button
+                    disabled={repoPage * 15 >= repoTotal || repoLoading}
+                    onClick={() => {
+                      const next = repoPage + 1;
+                      setRepoPage(next);
+                      fetchRepositoryScans(searchQuery, statusFilter, next);
+                    }}
+                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded border border-slate-700 transition"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>

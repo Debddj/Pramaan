@@ -120,4 +120,33 @@ export const api = {
     const query = token ? `?token=${encodeURIComponent(token)}` : "";
     return `${currentBaseUrl}/reports/${scanUuid}/pdf${query}`;
   },
+
+  getNoticeCsvUrl(scanUuid: string) {
+    const token = authToken || getAuthToken();
+    const query = token ? `?token=${encodeURIComponent(token)}` : "";
+    return `${currentBaseUrl}/reports/${scanUuid}/csv${query}`;
+  },
+
+  getNoticeJsonUrl(scanUuid: string) {
+    const token = authToken || getAuthToken();
+    const query = token ? `?token=${encodeURIComponent(token)}` : "";
+    return `${currentBaseUrl}/reports/${scanUuid}/json${query}`;
+  },
+
+  async searchScans(params: { q?: string; status?: string; page?: number; limit?: number }) {
+    const res = await apiClient.get("/scans", {
+      params: {
+        q: params.q || undefined,
+        status: params.status && params.status !== "all" ? params.status : undefined,
+        page: params.page || 1,
+        limit: params.limit || 20,
+      },
+    });
+    return res.data;
+  },
+
+  async getScan(scanUuid: string) {
+    const res = await apiClient.get(`/scans/${scanUuid}`);
+    return res.data;
+  },
 };

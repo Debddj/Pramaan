@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Scale, AlertTriangle, BarChart3, PlusCircle, LogOut, KeyRound } from 'lucide-react';
+import { ShieldCheck, Scale, AlertTriangle, BarChart3, PlusCircle, LogOut, KeyRound, Search } from 'lucide-react';
 import { OfficerSession } from '../api/types';
 
 interface NavbarProps {
   activeTab: string;
-  setActiveTab: (tab: 'dashboard' | 'adjudication' | 'review') => void;
+  setActiveTab: (tab: 'dashboard' | 'adjudication' | 'review' | 'repository') => void;
   reviewCount: number;
   officerSession: OfficerSession | null;
   onOpenNewInspection: () => void;
@@ -58,6 +58,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <BarChart3 className="w-4 h-4" />
             <span>Overview</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('repository')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              activeTab === 'repository'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            <span>Repository & Search</span>
           </button>
 
           <button

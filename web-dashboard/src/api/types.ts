@@ -1,4 +1,4 @@
-﻿export interface OfficerSession {
+export interface OfficerSession {
   token: string;
   email: string;
   name: string;
@@ -98,4 +98,27 @@ export interface ReviewActionRequest {
   adjudication: 'mark_compliant' | 'approve_violation';
   notes?: string;
   corrected_height_mm?: number;
+}
+
+export interface RepositoryScanItem {
+  id: number;
+  scan_uuid: string;
+  barcode: string;
+  product: string;
+  manufacturer?: string;
+  status: 'compliant' | 'violation' | 'under_review' | 'exempt' | string;
+  confidence: number;
+  pdp_area_sq_cm?: number;
+  measured_numeral_height_mm?: number;
+  violations_count: number;
+  time: string;
+  created_at: string;
+  officer: string;
+}
+
+export interface ScanSearchResponse {
+  total: number;
+  page: number;
+  limit: number;
+  scans: RepositoryScanItem[];
 }

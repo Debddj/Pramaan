@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func, cast, String
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
@@ -341,4 +342,123 @@ async def process_scan_upload(
         client_barcode=barcode,
         pdp_area_sq_cm=pdp_area_sq_cm,
         category=category,
+    )
+
+
+@router.get("/scans")
+def list_and_search_scans(
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Search and retrieval facility across all historically scanned packaged commodities.
+    Supports filtering by search term (barcode, commodity, manufacturer, UUID),
+    compliance status, and pagination.
+    """
+    page = max(1, page)
+    limit = min(100, max(1, limit))
+
+    query = db.query(Scan)
+
+    if status and status.lower() not in ("all", ""):
+        query = query.filter(Scan.status == status.lower())
+
+    if q and q.strip():
+        term = q.strip()
+        search_filter = or_(
+            Scan.scan_uuid.ilike(f"%{term}%"),
+            Scan.barcode.ilike(f"%{term}%"),
+            cast(Scan.extracted_data, String).ilike(f"%{term}%"),
+        )
+        query = query.filter(search_filter)
+
+    total = query.count()
+    scans = (
+        query.order_by(Scan.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    items = []
+    for s in scans:
+        extracted = s.extracted_data or {}
+        viol_count = db.query(Violation).filter(Violation.scan_id == s.id).count()
+        items.append({
+            "id": s.id,
+            "scan_uuid": s.scan_uuid,
+            "barcode": s.barcode or "N/A",
+            "product": extracted.get("generic_name") or "Packaged Commodity",
+            "manufacturer": extracted.get("manufacturer_name") or "Unknown Manufacturer",
+            "status": s.status or "compliant",
+            "confidence": s.extraction_confidence or 0.0,
+            "pdp_area_sq_cm": s.pdp_area_sq_cm,
+            "measured_numeral_height_mm": s.measured_numeral_height_mm,
+            "violations_count": viol_count,
+            "time": s.created_at.strftime("%H:%M:%S") if s.created_at else "",
+            "created_at": s.created_at.isoformat() if s.created_at else "",
+            "officer": current_user.full_name or "Authorized Officer",
+        })
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "scans": items,
+    }
+
+
+@router.get("/scans/{scan_uuid}", response_model=ScanResult)
+def get_scan_by_uuid(
+    scan_uuid: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieves full inspection verdict, evidence parameters, and codified violations
+    for a specific historical scan UUID.
+    """
+    scan = db.query(Scan).filter(Scan.scan_uuid == scan_uuid).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    db_violations = db.query(Violation).filter(Violation.scan_id == scan.id).all()
+    violations = [
+        ViolationOut(
+            rule_id=v.rule_id,
+            citation=v.citation,
+            severity=v.severity,
+            measured_value=v.measured_value,
+            required_value=v.required_value,
+            violation_text=v.violation_text,
+        )
+        for v in db_violations
+    ]
+
+    extracted_decl = LabelDeclaration(**(scan.extracted_data or {})) if scan.extracted_data else LabelDeclaration()
+
+    return ScanResult(
+        scan_uuid=scan.scan_uuid,
+        barcode=scan.barcode,
+        status=scan.status,
+        overall_confidence=scan.extraction_confidence or 0.0,
+        needs_review=scan.needs_review,
+        is_calibrated=bool(scan.scale_factor_mm_per_px),
+        calibration_status="calibrated" if scan.scale_factor_mm_per_px else "uncalibrated",
+        is_checksum_valid=validate_ean13_checksum(scan.barcode or "") if scan.barcode else None,
+        calibration_note="Retrieved from statutory inspection repository",
+        authoritative_cv=bool(scan.image_data_base64),
+        is_duplicate=False,
+        scale_factor_mm_per_px=scan.scale_factor_mm_per_px,
+        pdp_area_sq_cm=scan.pdp_area_sq_cm,
+        measured_numeral_height_mm=scan.measured_numeral_height_mm,
+        extracted_declarations=extracted_decl,
+        violations=violations,
+        sha256_hash=scan.image_hash_sha256,
+        image_url=scan.image_path,
+        timestamp=scan.created_at,
     )
