@@ -7,7 +7,11 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Camera, CameraType, FlashMode } from "expo-camera";
+import {
+  CameraView,
+  useCameraPermissions,
+  type BarcodeScanningResult,
+} from "expo-camera";
 import { Accelerometer } from "expo-sensors";
 import { api } from "../services/api";
 import { offlineQueue } from "../services/offlineQueue";
@@ -19,7 +23,8 @@ export const CaptureScreenConfig = {
 };
 
 export const CaptureScreen = ({ navigation }: any) => {
-  const cameraRef = useRef<Camera | null>(null);
+  const cameraRef = useRef<CameraView | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isStable, setIsStable] = useState<boolean>(true);
   const [jitter, setJitter] = useState<number>(0.05);
@@ -38,8 +43,8 @@ export const CaptureScreen = ({ navigation }: any) => {
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(status === "granted");
+        const perm = await requestPermission();
+        setHasPermission(perm.granted);
       } catch (err) {
         console.warn("Camera permission request error:", err);
         setHasPermission(false);
@@ -63,15 +68,15 @@ export const CaptureScreen = ({ navigation }: any) => {
 
   const handleRequestPermission = async () => {
     try {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === "granted");
+      const perm = await requestPermission();
+      setHasPermission(perm.granted);
     } catch (err: any) {
       Alert.alert("Permission Error", err.message || "Failed to request camera access.");
     }
   };
 
   // Real-time Barcode Detection Handler
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+  const handleBarCodeScanned = ({ type, data }: BarcodeScanningResult) => {
     if (data && data !== detectedBarcode) {
       setDetectedBarcode(data);
       setBarcodeType(type);
@@ -206,15 +211,15 @@ export const CaptureScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Live Camera Viewfinder with HUD Reticle */}
       <View style={styles.cameraBox}>
-        <Camera
+        <CameraView
           ref={(ref) => {
             cameraRef.current = ref;
           }}
-          style={StyleSheet.absoluteFillObject}
-          type={CameraType.back}
-          flashMode={torchOn ? FlashMode.torch : FlashMode.off}
-          barCodeScannerSettings={{
-            barCodeTypes: [
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          enableTorch={torchOn}
+          barcodeScannerSettings={{
+            barcodeTypes: [
               "ean13",
               "ean8",
               "upc_a",
@@ -224,7 +229,7 @@ export const CaptureScreen = ({ navigation }: any) => {
               "qr",
             ],
           }}
-          onBarCodeScanned={isBarcodeLocked ? undefined : handleBarCodeScanned}
+          onBarcodeScanned={isBarcodeLocked ? undefined : handleBarCodeScanned}
         />
 
         {/* HUD Reticle Overlay */}
