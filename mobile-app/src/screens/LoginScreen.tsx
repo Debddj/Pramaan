@@ -37,11 +37,13 @@ export const LoginScreen = ({ navigation }: any) => {
       await api.login(email, password);
       navigation.replace("Capture");
     } catch (err: any) {
-      Alert.alert(
-        "Authentication Failed",
-        err.response?.data?.detail ||
-          `Unable to connect to Pramaan Server (${getBaseUrl()}). Tap 'Server Settings' to verify URL.`
-      );
+      const serverDetail = err.response?.data?.detail;
+      const netMsg = err.message || "Network Error";
+      const displayMsg = serverDetail
+        ? `Server: ${serverDetail}`
+        : `${netMsg}\n\nUnable to reach: ${getBaseUrl()}\n\nNote: Render free tier spins down when inactive. If the server was sleeping, please wait a moment and tap 'Authenticate Officer' again now that it is warm.`;
+
+      Alert.alert("Authentication Failed", displayMsg);
     } finally {
       setLoading(false);
     }
